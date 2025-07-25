@@ -269,6 +269,9 @@
         render();
     });
 
+    // ##########################
+    // ### START: CORRECTED BLOCK ###
+    // ##########################
     binArea.addEventListener('click', (e) => {
         if (e.target.classList.contains('delete-bin-btn')) {
             const binToDeleteEl = e.target.closest('.bin');
@@ -277,9 +280,18 @@
             const binData = AppState.bins.get(binId);
             if (confirm(`確定要刪除「${binData.name}」嗎？\n(箱內所有商品將會被移回待分箱區)`)) {
                 if (binData.items && binData.items.size > 0) {
-                    binData.items.forEach(itemToReturn => {
+                    
+                    // --- 【核心修正】---
+                    // 先將 Map 中的項目轉為一個獨立的陣列，避免在迭代時修改集合導致錯誤。
+                    const itemsToReturn = Array.from(binData.items.values());
+                    
+                    // 遍歷這個新建立的獨立陣列
+                    itemsToReturn.forEach(itemToReturn => {
+                        // moveItem 函式現在可以安全地修改原始的 AppState.bins 中的 items Map
                         moveItem(itemToReturn.id, binId, 'pool', itemToReturn.quantity, false);
                     });
+                    // --- 【修正結束】---
+
                 }
                 AppState.bins.delete(binId);
                 reIndexBins();
@@ -287,6 +299,9 @@
             }
         }
     });
+    // ########################
+    // ### END: CORRECTED BLOCK ###
+    // ########################
 
     exportA4PdfBtn.addEventListener('click', exportA4PDF);
     exportA5PdfBtn.addEventListener('click', exportA5BoxLabelsPDF);
