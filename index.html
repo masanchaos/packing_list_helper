@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V60)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <title>智慧拖拽分箱工具 (V72 - 最終穩定版)</title>
     <style>
         /* --- 全局與佈局 --- */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
@@ -27,11 +26,11 @@
         #export-a4-pdf-btn:hover { background-color: #138496; }
         #export-a5-pdf-btn { background-color: #fd7e14; }
         #export-a5-pdf-btn:hover { background-color: #e86a02; }
-
-        /* [新增] 清除按鈕樣式 */
         #clear-data-btn { background-color: #dc3545; }
         #clear-data-btn:hover { background-color: #c82333; }
-        
+        #quick-add-bins-btn { background-color: #20c997; }
+        #quick-add-bins-btn:hover { background-color: #1baa80; }
+
         /* --- 列表與輸入框 --- */
         .list-header { padding: 0 20px; }
         .list-header h2, #bin-area-title { display: flex; justify-content: space-between; align-items: center; }
@@ -52,7 +51,7 @@
         .bin h3 { margin: 0 0 10px 0; color: #666; display: flex; justify-content: space-between; align-items: center; }
         .delete-bin-btn { color: #dc3545; cursor: pointer; font-weight: bold; padding: 2px 5px; border-radius: 4px; }
         .delete-bin-btn:hover { background-color: #f8d7da; }
-        .bin .tracking-input { width: calc(100% - 22px); margin-top: 10px; padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .bin .tracking-input { width: calc(100% - 22px); margin-bottom: 10px; padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; }
         .drag-over { background-color: #e2e6ea; border-color: #007bff !important; }
         
         /* --- 彈出視窗 (Modal) --- */
@@ -69,35 +68,19 @@
 
         /* --- 選擇視窗樣式 --- */
         #choice-list .choice-item {
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            text-align: left;
-            transition: background-color 0.2s;
+            padding: 10px 12px; border: 1px solid #ddd; border-radius: 4px;
+            margin-bottom: 8px; cursor: pointer; text-align: left; transition: background-color 0.2s;
         }
-        #choice-list .choice-item:hover {
-            background-color: #f0f8ff;
-        }
-        #choice-list .choice-item .details {
-            font-size: 12px;
-            color: #555;
-            margin-top: 4px;
-        }
+        #choice-list .choice-item:hover { background-color: #f0f8ff; }
+        #choice-list .choice-item .details { font-size: 12px; color: #555; margin-top: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="item-pool-container" class="panel">
             <div class="order-input"><label for="order-number-input">訂單號碼:</label><input type="text" id="order-number-input" placeholder="請在此輸入本次作業的訂單號碼"></div>
-            <div class="controls"><textarea id="data-input" placeholder="1. 在此貼上商品資料..."></textarea>
-                <div class="button-group">
-                    <button id="parse-btn">解析資料</button>
-                    <button id="clear-data-btn">清除全部資料</button>
-                </div>
-            </div>
-            <div class="command-group"><label for="command-input">快速指令:</label><div style="display:flex; gap: 10px;"><input type="text" id="command-input" placeholder="搜尋詞 數量 箱號 (0=待分箱區)" style="margin-bottom:0; flex-grow:1;"><button id="execute-command-btn">執行</button></div></div>
+            <div class="controls"><textarea id="data-input" placeholder="1. 在此貼上商品資料..."></textarea><div class="button-group"><button id="parse-btn">解析資料</button><button id="clear-data-btn">清除全部資料</button></div></div>
+            <div class="command-group"><label for="command-input">快速指令:</label><div style="display:flex; gap: 10px;"><input type="text" id="command-input" placeholder="詞 數 箱號 (0=待分箱區)" style="margin-bottom:0; flex-grow:1;"><button id="execute-command-btn">執行</button></div></div>
             <div class="list-header"><h2 id="pool-title">待分箱區</h2><input type="text" id="search-box" placeholder="🔍 在此透過關鍵字篩選商品 (可用 、 分隔)" style="margin: 0 20px 10px 20px; width: calc(100% - 40px);"></div>
             <div id="item-list-content"></div>
         </div>
@@ -105,6 +88,7 @@
             <div class="controls" id="bin-controls">
                 <div class="button-group">
                     <button id="add-bin-btn">新增箱子</button>
+                    <button id="quick-add-bins-btn">快速生成多箱</button>
                     <button id="export-btn">匯出 CSV</button>
                     <button id="export-a4-pdf-btn">匯出 PDF (A4總表)</button>
                     <button id="export-a5-pdf-btn">匯出 PDF (A5箱貼)</button>
@@ -129,8 +113,7 @@
         <div class="modal-content">
             <h3>發現多個符合項目</h3>
             <p>請選擇您要操作的確切商品：</p>
-            <div id="choice-list" style="max-height: 200px; overflow-y: auto; margin: 15px 0;">
-            </div>
+            <div id="choice-list" style="max-height: 200px; overflow-y: auto; margin: 15px 0;"></div>
             <button id="choice-cancel-btn" style="background-color: #6c757d; margin-top: 10px; width: 100%;">取消</button>
         </div>
     </div>
@@ -141,6 +124,8 @@
     const dataInput = document.getElementById('data-input');
     const parseBtn = document.getElementById('parse-btn');
     const addBinBtn = document.getElementById('add-bin-btn');
+    const clearDataBtn = document.getElementById('clear-data-btn');
+    const quickAddBinsBtn = document.getElementById('quick-add-bins-btn');
     const itemListContent = document.getElementById('item-list-content');
     const binArea = document.getElementById('bin-area');
     const searchBox = document.getElementById('search-box');
@@ -159,13 +144,13 @@
     const choiceModal = document.getElementById('choice-modal');
     const choiceList = document.getElementById('choice-list');
     const choiceCancelBtn = document.getElementById('choice-cancel-btn');
-    const clearDataBtn = document.getElementById('clear-data-btn'); // [新增]
     
     let AppState = { pool: new Map(), bins: new Map() };
     let binCounter = 0;
     let currentSearchTerm = '';
     let modalCallback = null;
 
+    // --- 核心渲染函式 ---
     function render() {
         itemListContent.innerHTML = '';
         const searchKeywords = currentSearchTerm.split(/[,、\s]+/).filter(Boolean);
@@ -174,9 +159,7 @@
             const itemText = `${item.name} ${item.code} ${item.barcode}`.toLowerCase();
             return searchKeywords.some(keyword => itemText.includes(keyword));
         });
-        itemsToRender.forEach(item => {
-            itemListContent.appendChild(createItemElement(item, 'pool'));
-        });
+        itemsToRender.forEach(item => { itemListContent.appendChild(createItemElement(item, 'pool')); });
         binArea.innerHTML = '';
         AppState.bins.forEach((binData, binId) => {
             const binEl = document.createElement('div');
@@ -194,15 +177,16 @@
                 saveStateToLocalStorage();
             });
             binEl.appendChild(title);
+            binEl.appendChild(trackingInput);
             binData.items.forEach(item => {
                 binEl.appendChild(createItemElement(item, binId));
             });
-            binEl.appendChild(trackingInput);
             binArea.appendChild(binEl);
         });
         updateCounts();
     }
     
+    // --- 核心與輔助函式 ---
     function createItemElement(item, source) {
         const itemEl = document.createElement('div');
         itemEl.className = 'item';
@@ -347,7 +331,6 @@
         return poolMap;
     }
 
-    // [新增] 清除所有資料的函式
     function clearAllData() {
         if (confirm("您確定要清除所有資料嗎？\n這個操作無法復原，將會清空待分箱區、所有箱子和訂單號碼。")) {
             AppState.pool.clear();
@@ -357,10 +340,28 @@
             dataInput.value = '';
             searchBox.value = '';
             currentSearchTerm = '';
-            localStorage.removeItem('binningToolState_v60');
+            localStorage.removeItem('binningToolState_v71');
             render();
             showToast("所有資料已成功清除。", 'success');
         }
+    }
+
+    function quickAddBins() {
+        const numStr = prompt("請輸入要一次新增的箱子數量：", "5");
+        if (numStr === null) return;
+        const num = parseInt(numStr);
+        if (isNaN(num) || num <= 0 || num > 100) {
+            showToast("請輸入一個 1 到 100 之間的有效數字。", "error");
+            return;
+        }
+        for (let i = 0; i < num; i++) {
+            binCounter++;
+            const binId = `bin-${binCounter}`;
+            AppState.bins.set(binId, { name: `第 ${binCounter} 箱`, tracking: '', items: new Map() });
+        }
+        render();
+        saveStateToLocalStorage();
+        showToast(`已成功新增 ${num} 個箱子。`, 'success');
     }
 
     // --- 事件監聽器綁定 ---
@@ -385,6 +386,8 @@
         render();
         saveStateToLocalStorage();
     });
+    clearDataBtn.addEventListener('click', clearAllData);
+    quickAddBinsBtn.addEventListener('click', quickAddBins);
     searchBox.addEventListener('input', () => {
         currentSearchTerm = searchBox.value.trim().toLowerCase();
         render();
@@ -406,8 +409,6 @@
             }
         }
     });
-    clearDataBtn.addEventListener('click', clearAllData); // [新增]
-
     document.addEventListener('dragstart', e => {
         const itemEl = e.target.closest('.item');
         if (itemEl) {
@@ -424,12 +425,8 @@
         const targetPool = e.target.closest('#item-list-content');
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         itemListContent.style.borderColor = 'transparent';
-        if (targetBin) {
-            targetBin.classList.add('drag-over');
-        }
-        if (targetPool) {
-            itemListContent.style.borderColor = '#007bff';
-        }
+        if (targetBin) { targetBin.classList.add('drag-over'); }
+        if (targetPool) { itemListContent.style.borderColor = '#007bff'; }
     });
     document.addEventListener('dragleave', e => {
         const targetBin = e.target.closest('.bin');
@@ -466,7 +463,8 @@
             }
         } catch (err) { console.error("拖曳資料解析失敗:", err); }
     });
-    modalConfirmBtn.addEventListener('click', () => {
+    
+    function handleModalConfirm() {
         const amount = parseInt(modalQuantityInput.value);
         const maxAmount = parseInt(modalQuantityInput.max);
         if (amount > 0 && amount <= maxAmount && modalCallback) {
@@ -474,6 +472,13 @@
             hideQuantityModal();
         } else {
             showToast(`請輸入 1 到 ${maxAmount} 之間的有效數量！`, 'error');
+        }
+    }
+    modalConfirmBtn.addEventListener('click', handleModalConfirm);
+    modalQuantityInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleModalConfirm();
         }
     });
     modalCancelBtn.addEventListener('click', hideQuantityModal);
@@ -539,6 +544,7 @@
         const exportBtn = document.getElementById('export-btn');
         const exportA4PdfBtn = document.getElementById('export-a4-pdf-btn');
         const exportA5PdfBtn = document.getElementById('export-a5-pdf-btn');
+
         function generateExportFilename(extension) {
             const now = new Date();
             const hh = String(now.getHours()).padStart(2, '0');
@@ -547,6 +553,7 @@
             const orderNumber = orderNumberInput.value.trim() || 'NoOrder';
             return `${orderNumber}_${hh}${mm}${ss}_packing_list${extension}`;
         }
+
         function exportCSV() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
@@ -577,17 +584,21 @@
             link.click();
             document.body.removeChild(link);
         }
+
         function exportA4PDF() {
             if (AppState.bins.size === 0 && AppState.pool.size === 0) { showToast("沒有任何資料可以匯出！", "error"); return; }
             const btn = document.getElementById('export-a4-pdf-btn');
-            btn.disabled = true; btn.textContent = '正在產生...';
+            btn.disabled = true; btn.textContent = '準備預覽...';
             const poolTotal = Array.from(AppState.pool.values()).reduce((sum, item) => sum + item.quantity, 0);
             let binsTotal = 0;
             AppState.bins.forEach(binData => { binsTotal += Array.from(binData.items.values()).reduce((sum, item) => sum + item.quantity, 0); });
             const orderTotal = poolTotal + binsTotal;
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
             const exportDate = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
-            let contentHTML = `<style>body{font-family:'Helvetica','Arial','Microsoft JhengHei',sans-serif;font-size:10px;}.pdf-container{margin:20px;}.pdf-header h1{font-size:24px;}.pdf-header p{font-size:12px;}table{width:100%;border-collapse:collapse;margin-top:10px;}th,td{border:1px solid #ddd;padding:6px;text-align:left;word-break:break-all;}th{background-color:#f8f8f8;}.pdf-bin{page-break-inside:avoid; margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 8px;}</style><div class="pdf-container"><div class="pdf-header"><h1>分箱明細總表</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p><p><strong>匯出日期:</strong> ${exportDate}</p><p><strong>訂單總數:</strong> ${orderTotal}</p></div>`;
+            
+            const printStyles = `<style>@media print { body { margin: 0; -webkit-print-color-adjust: exact; } } body{font-family:'Helvetica','Arial','Microsoft JhengHei',sans-serif;font-size:10px;}.pdf-container{margin:20px;}.pdf-header h1{font-size:24px;}.pdf-header p{font-size:12px;}table{width:100%;border-collapse:collapse;margin-top:10px;}th,td{border:1px solid #ddd;padding:6px;text-align:left;word-break:break-all;}th{background-color:#f8f8f8;}.pdf-bin{page-break-inside:avoid; margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 8px;}</style>`;
+            
+            let contentHTML = `<div class="pdf-container"><div class="pdf-header"><h1>分箱明細總表</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p><p><strong>匯出日期:</strong> ${exportDate}</p><p><strong>訂單總數:</strong> ${orderTotal}</p></div>`;
             const totalBins = AppState.bins.size;
             Array.from(AppState.bins.values()).forEach((binData, binIndex) => {
                 const newTitle = `第 ${totalBins}-${binIndex + 1} 箱`;
@@ -600,18 +611,27 @@
                 contentHTML += `</tbody></table></div>`;
             });
             contentHTML += '</div>';
-            const element = document.createElement('div');
-            element.innerHTML = contentHTML;
-            const opt = { margin: 0.5, filename: generateExportFilename('.pdf'), image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-            html2pdf().from(element).set(opt).save().then(() => { btn.disabled = false; btn.textContent = '匯出 PDF (A4總表)'; });
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
+                btn.disabled = false; btn.textContent = '匯出 PDF (A4總表)';
+                return;
+            }
+            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>A4分箱總表 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
+            btn.disabled = false; btn.textContent = '匯出 PDF (A4總表)';
         }
+
         function exportA5BoxLabelsPDF() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
             const btn = document.getElementById('export-a5-pdf-btn');
-            btn.disabled = true; btn.textContent = '正在產生...';
+            btn.disabled = true; btn.textContent = '準備預覽...';
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
+            const printStyles = `<style>@media print{body{margin:0;-webkit-print-color-adjust:exact}}*{box-sizing:border-box}body{font-family:'Helvetica','Arial','Microsoft JhengHei',sans-serif}.a5-label-page{width:210mm;height:132.5mm;padding:7mm;page-break-after:always;border:1px dashed #ccc;margin:10mm auto}.a5-label-page:last-child{page-break-after:auto}.header,.footer{text-align:center}.header h1{margin:0 0 5px 0;font-size:26px}.header p{margin:0;font-size:16px}.content{margin-top:5px}.content table{width:100%;border-collapse:collapse}.content th,.content td{border:1px solid #ccc;padding:3px;text-align:left;font-size:12px;line-height:1.2}.content th{background-color:#f2f2f2}.footer{margin-top:15px;padding-top:8px}.footer p{font-size:14px;margin:3px 0}.footer-table{display:inline-table;text-align:left;font-size:16px;margin-top:5px}.footer-table td{padding:3px 5px}</style>`;
+            
             let contentHTML = ``;
-            const pageStyles = `<style> * { box-sizing: border-box; } html, body { margin: 0; padding: 0; font-family: 'Helvetica', 'Arial', 'Microsoft JhengHei', sans-serif; } .a5-label-page { width: 210mm; height: 148.5mm; padding: 7mm; display: flex; flex-direction: column; page-break-after: always; } .a5-label-page:last-child { page-break-after: auto; } .header, .footer { flex-shrink: 0; text-align: center; } .header h1 { margin: 0 0 5px 0; font-size: 26px; } .header p { margin: 0; font-size: 16px; } .content { overflow: hidden; margin-top: 5px; } .content table { width: 100%; border-collapse: collapse; } .content th, .content td { border: 1px solid #ccc; padding: 3px; text-align: left; font-size: 12px; line-height: 1.2; } .content th { background-color: #f2f2f2; } .footer { margin-top: auto; padding-top: 8px; } .footer p { font-size: 14px; margin: 3px 0; } .footer-table { display: inline-table; text-align: left; font-size: 16px; margin-top: 5px; } .footer-table td { padding: 3px 5px; } </style>`;
             const binsArray = Array.from(AppState.bins.values());
             const totalBins = binsArray.length;
             binsArray.forEach((binData, binIndex) => {
@@ -622,8 +642,8 @@
                 for (let i = 0; i < totalPagesForBin; i++) {
                     const itemChunk = itemsArray.slice(i * chunkSize, (i + 1) * chunkSize);
                     const newTitle = `第 ${totalBins}-${binIndex + 1} 箱 <span style="font-size: 60%;">(${i + 1}/${totalPagesForBin})</span>`;
-                    const footerHTML = `<div class="footer" style="text-align:center"><p><strong>本箱總數: ${binTotal} 件</strong></p><table class="footer-table"><tbody><tr><td><strong>運單號:</strong></td><td>${binData.tracking || '___________________'}</td></tr><tr><td><strong>簽收:</strong></td><td>___________________</td></tr></tbody></table></div>`;
-                    contentHTML += `<div class="a5-label-page"><div class="header" style="text-align:center"><h1>${newTitle}</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p></div><div class="content"><table><thead><tr><th style="width:80%">品項名稱</th><th>數量</th></tr></thead><tbody>`;
+                    const footerHTML = `<div class="footer"><p><strong>本箱總數: ${binTotal} 件</strong></p><table class="footer-table"><tbody><tr><td><strong>運單號:</strong></td><td>${binData.tracking || '___________________'}</td></tr><tr><td><strong>簽收:</strong></td><td>___________________</td></tr></tbody></table></div>`;
+                    contentHTML += `<div class="a5-label-page"><div class="header"><h1>${newTitle}</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p></div><div class="content"><table><thead><tr><th style="width:80%">品項名稱</th><th>數量</th></tr></thead><tbody>`;
                     if (itemChunk.length > 0) {
                         itemChunk.forEach(item => { contentHTML += `<tr><td>${item.name}</td><td style="text-align:center">${item.quantity}</td></tr>`; });
                     } else {
@@ -632,17 +652,25 @@
                     contentHTML += `</tbody></table></div>${footerHTML}</div>`;
                 }
             });
-            const element = document.createElement('div');
-            element.innerHTML = pageStyles + contentHTML;
-            const opt = { margin: 0, filename: generateExportFilename('_labels.pdf'), image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a5', orientation: 'landscape' } };
-            html2pdf().set(opt).from(element).save().then(() => { btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)'; });
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
+                btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
+                return;
+            }
+            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>列印箱貼 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
+            btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
         }
+
         exportBtn.addEventListener('click', exportCSV);
         exportA4PdfBtn.addEventListener('click', exportA4PDF);
         exportA5PdfBtn.addEventListener('click', exportA5BoxLabelsPDF);
     }
     setupExports();
-
+    
     function showToast(message, type = 'info') {
         const toast = document.createElement('div');
         toast.className = `toast-notification ${type}`;
@@ -665,11 +693,11 @@
                 binCounter: binCounter,
                 orderNumber: orderNumberInput.value,
             };
-            localStorage.setItem('binningToolState_v60', JSON.stringify(stateToSave));
+            localStorage.setItem('binningToolState_v72', JSON.stringify(stateToSave));
         } catch (e) { console.error("無法儲存狀態:", e); }
     }
     function loadStateFromLocalStorage() {
-        const savedStateJSON = localStorage.getItem('binningToolState_v60');
+        const savedStateJSON = localStorage.getItem('binningToolState_v72');
         if (!savedStateJSON) return;
         try {
             const savedState = JSON.parse(savedStateJSON);
@@ -683,7 +711,7 @@
             showToast("已成功載入上次的進度。", 'success');
         } catch(e) {
             console.error("載入狀態失敗:", e);
-            localStorage.removeItem('binningToolState_v60');
+            localStorage.removeItem('binningToolState_v72');
         }
     }
     
