@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V72 - 最終穩定版)</title>
+    <title>智慧拖拽分箱工具 (V73 - 指令升級版)</title>
     <style>
         /* --- 全局與佈局 --- */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
@@ -26,6 +26,8 @@
         #export-a4-pdf-btn:hover { background-color: #138496; }
         #export-a5-pdf-btn { background-color: #fd7e14; }
         #export-a5-pdf-btn:hover { background-color: #e86a02; }
+        #export-thermal-pdf-btn { background-color: #6f42c1; }
+        #export-thermal-pdf-btn:hover { background-color: #5a359a; }
         #clear-data-btn { background-color: #dc3545; }
         #clear-data-btn:hover { background-color: #c82333; }
         #quick-add-bins-btn { background-color: #20c997; }
@@ -80,7 +82,10 @@
         <div id="item-pool-container" class="panel">
             <div class="order-input"><label for="order-number-input">訂單號碼:</label><input type="text" id="order-number-input" placeholder="請在此輸入本次作業的訂單號碼"></div>
             <div class="controls"><textarea id="data-input" placeholder="1. 在此貼上商品資料..."></textarea><div class="button-group"><button id="parse-btn">解析資料</button><button id="clear-data-btn">清除全部資料</button></div></div>
-            <div class="command-group"><label for="command-input">快速指令:</label><div style="display:flex; gap: 10px;"><input type="text" id="command-input" placeholder="詞 數 箱號 (0=待分箱區)" style="margin-bottom:0; flex-grow:1;"><button id="execute-command-btn">執行</button></div></div>
+            <div class="command-group"><label for="command-input">快速指令:</label><div style="display:flex; gap: 10px;">
+                <input type="text" id="command-input" placeholder="詞 數 [來源箱] 去向箱(0=待分箱區)" style="margin-bottom:0; flex-grow:1;" title="範例:&#10;從待分箱區移出: '商品A 5 1' (5個商品A移到第1箱)&#10;從箱子移回待分箱區: '商品A 3 2 0' (3個商品A從第2箱移回)&#10;箱子之間移動: '商品A 2 1 3' (2個商品A從第1箱移到第3箱)">
+                <button id="execute-command-btn">執行</button>
+            </div></div>
             <div class="list-header"><h2 id="pool-title">待分箱區</h2><input type="text" id="search-box" placeholder="🔍 在此透過關鍵字篩選商品 (可用 、 分隔)" style="margin: 0 20px 10px 20px; width: calc(100% - 40px);"></div>
             <div id="item-list-content"></div>
         </div>
@@ -92,6 +97,7 @@
                     <button id="export-btn">匯出 CSV</button>
                     <button id="export-a4-pdf-btn">匯出 PDF (A4總表)</button>
                     <button id="export-a5-pdf-btn">匯出 PDF (A5箱貼)</button>
+                    <button id="export-thermal-pdf-btn">匯出 熱感紙 (10x15)</button>
                 </div>
             </div>
             <div id="bin-area-title-wrapper"></div>
@@ -277,7 +283,8 @@
         modalCallback = null;
     }
 
-    function showChoiceModal(results, quantityToMove, sourceId, targetIdOrBinNum) {
+    // === 修改: 參數改為直接接收 targetId ===
+    function showChoiceModal(results, quantityToMove, sourceId, targetId) {
         choiceList.innerHTML = '';
         results.forEach(item => {
             const choiceEl = document.createElement('div');
@@ -285,13 +292,13 @@
             choiceEl.innerHTML = `<strong>${item.name}</strong><div class="details">(編號: ${item.code})</div>`;
             choiceEl.addEventListener('click', () => {
                 hideChoiceModal();
-                const targetId = (sourceId === 'pool') ? `bin-${targetIdOrBinNum}` : 'pool';
                 const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId).items;
                 const selectedItem = sourceMap.get(item.code);
                 if (quantityToMove > selectedItem.quantity) {
                     showToast(`移動數量 (${quantityToMove}) 超過所選商品剩餘數量 (${selectedItem.quantity})！`, 'error');
                     return;
                 }
+                // 直接使用傳入的 targetId
                 moveItem(item.code, sourceId, targetId, quantityToMove);
                 showToast(`已對您選擇的 "${item.name}" 執行操作。`, 'success');
             });
@@ -340,7 +347,7 @@
             dataInput.value = '';
             searchBox.value = '';
             currentSearchTerm = '';
-            localStorage.removeItem('binningToolState_v71');
+            localStorage.removeItem('binningToolState_v72');
             render();
             showToast("所有資料已成功清除。", 'success');
         }
@@ -485,57 +492,100 @@
     choiceCancelBtn.addEventListener('click', hideChoiceModal);
 
     // --- 快速指令 ---
+    // === 修改: 全面升級指令解析邏輯 ===
     function processCommand(commandText) {
-        const tokens = commandText.trim().split(/\s+/);
-        if (tokens.length < 3) { showToast("指令格式錯誤！", 'error'); return false; }
-        let sourceMap, sourceId, targetIdOrBinNum, searchTerm, quantityToMove, quantityStr;
-        if (tokens.length >= 4 && tokens[tokens.length - 1] === '0') {
-            sourceId = `bin-${tokens[tokens.length - 2]}`;
-            sourceMap = AppState.bins.get(sourceId)?.items;
-            targetIdOrBinNum = 'pool';
-            quantityStr = tokens[tokens.length - 3];
+        const tokens = commandText.trim().split(/\s+/).filter(Boolean); // 過濾空字串
+        if (tokens.length < 3) {
+            showToast("指令格式錯誤！請檢查格式。", 'error');
+            return false;
+        }
+
+        let sourceId, targetId, searchTerm, quantityToMove;
+        const isNumeric = (str) => str !== null && str.trim() !== '' && !isNaN(str) && !isNaN(parseFloat(str));
+
+        const L1 = tokens[tokens.length - 1]; // 最後一個
+        const L2 = tokens[tokens.length - 2]; // 倒數第二個
+        const L3 = tokens.length >= 3 ? tokens[tokens.length - 3] : null; // 倒數第三個
+
+        // 模式一: 箱子之間移動 或 從箱子移回待分箱區
+        // 格式: [關鍵字...] [數量] [來源箱] [去向箱/0]
+        if (tokens.length >= 4 && isNumeric(L1) && isNumeric(L2) && isNumeric(L3)) {
+            const fromBinNum = L2;
+            const toBinNum = L1;
+            
+            sourceId = `bin-${fromBinNum}`;
+            
+            if (toBinNum === '0') {
+                targetId = 'pool';
+            } else {
+                targetId = `bin-${toBinNum}`;
+                if (!AppState.bins.has(targetId)) {
+                    showToast(`指令錯誤：找不到目標箱號 ${toBinNum}！`, 'error');
+                    return false;
+                }
+            }
+            
+            quantityToMove = parseInt(L3);
             searchTerm = tokens.slice(0, tokens.length - 3).join(' ');
-        } else {
+        } 
+        // 模式二: 從待分箱區移到箱子
+        // 格式: [關鍵字...] [數量] [去向箱]
+        else if (isNumeric(L1) && isNumeric(L2)) {
+            const toBinNum = L1;
             sourceId = 'pool';
-            sourceMap = AppState.pool;
-            targetIdOrBinNum = tokens[tokens.length - 1];
-            quantityStr = tokens[tokens.length - 2];
+            targetId = `bin-${toBinNum}`;
+             if (!AppState.bins.has(targetId)) {
+                showToast(`指令錯誤：找不到目標箱號 ${toBinNum}！`, 'error');
+                return false;
+            }
+            quantityToMove = parseInt(L2);
             searchTerm = tokens.slice(0, tokens.length - 2).join(' ');
         }
-        quantityToMove = parseInt(quantityStr);
-        if (!sourceMap) { showToast(`指令錯誤：找不到來源 "${sourceId}"！`, 'error'); return false; }
-        if (isNaN(quantityToMove) || quantityToMove <= 0) { showToast("指令錯誤：數量無效。", 'error'); return false; }
-        if (sourceId === 'pool') {
-            const targetBin = AppState.bins.get(`bin-${targetIdOrBinNum}`);
-            if (!targetBin) { showToast(`指令錯誤：找不到目標箱號 ${targetIdOrBinNum}！`, 'error'); return false; }
+        // 無法識別的格式
+        else {
+            showToast("指令格式無法識別！\n請使用: (詞 數 去向箱) 或 (詞 數 來源箱 去向箱/0)", "error");
+            return false;
         }
+        
+        // --- 後續執行邏輯 ---
+        const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId)?.items;
+
+        if (!sourceMap) { showToast(`指令錯誤：找不到來源「${sourceId}」！`, 'error'); return false; }
+        if (isNaN(quantityToMove) || quantityToMove <= 0) { showToast("指令錯誤：數量必須是正整數。", 'error'); return false; }
+        if (searchTerm.trim() === '') { showToast("指令錯誤：搜尋關鍵字不能為空。", 'error'); return false; }
+
         const searchLower = searchTerm.toLowerCase();
         const results = Array.from(sourceMap.values()).filter(item => 
             item.name.toLowerCase().includes(searchLower) || 
             item.code.toLowerCase().includes(searchLower) ||
             (item.barcode && item.barcode.toLowerCase().includes(searchLower))
         );
+        
         if (results.length === 0) {
-            showToast(`指令錯誤：在來源 (${sourceId}) 找不到符合 "${searchTerm}" 的商品！`, 'error');
+            showToast(`在來源 (${sourceId}) 找不到符合 "${searchTerm}" 的商品`, 'error');
             return false;
         }
+        
         if (results.length === 1) {
             const targetItem = results[0];
             if (quantityToMove > targetItem.quantity) {
-                showToast(`指令錯誤：移動數量 (${quantityToMove}) 超過現有數量 (${targetItem.quantity})！`, 'error');
+                showToast(`移動數量 (${quantityToMove}) 超過現有數量 (${targetItem.quantity})`, 'error');
                 return false;
             }
-            const targetId = (sourceId === 'pool') ? `bin-${targetIdOrBinNum}` : 'pool';
             moveItem(targetItem.code, sourceId, targetId, quantityToMove);
             showToast(`已將 ${quantityToMove} 個 "${targetItem.name}" 執行移動。`, 'success');
             return true;
         }
+        
         if (results.length > 1) {
             showToast(`發現 ${results.length} 個符合項目，請選擇...`);
-            showChoiceModal(results, quantityToMove, sourceId, targetIdOrBinNum);
+            showChoiceModal(results, quantityToMove, sourceId, targetId);
             return true;
         }
+
+        return false;
     }
+
     executeCommandBtn.addEventListener('click', () => { if (processCommand(commandInput.value)) { commandInput.value = ''; } });
     commandInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeCommandBtn.click(); } });
     
@@ -544,6 +594,7 @@
         const exportBtn = document.getElementById('export-btn');
         const exportA4PdfBtn = document.getElementById('export-a4-pdf-btn');
         const exportA5PdfBtn = document.getElementById('export-a5-pdf-btn');
+        const exportThermalPdfBtn = document.getElementById('export-thermal-pdf-btn');
 
         function generateExportFilename(extension) {
             const now = new Date();
@@ -557,25 +608,36 @@
         function exportCSV() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
-            let csvContent = "\uFEFF";
+            let csvContent = "\uFEFF"; // BOM for Excel to recognize UTF-8
             csvContent += "訂單號碼,箱號,運單號,商品編號,國際條碼,品項名稱,數量\n";
-            const formatAsExcelText = (value) => {
-                if (!value && value !== 0) return '';
-                return `="\\t${String(value).replace(/"/g, '""')}"`;
+
+            const formatCsvField = (value) => {
+                if (value === null || value === undefined) {
+                    return '';
+                }
+                let stringValue = String(value);
+                stringValue = stringValue.replace(/"/g, '""');
+                if (stringValue.search(/("|,|\n)/g) >= 0) {
+                    stringValue = `"${stringValue}"`;
+                }
+                return stringValue;
             };
+
             AppState.bins.forEach(binData => {
                 if (binData.items.size === 0) {
-                    csvContent += [orderNumber, binData.name, binData.tracking, '', '', '"此箱無商品"', 0].join(',') + "\n";
+                    const row = [orderNumber, binData.name, binData.tracking, '', '', '此箱無商品', 0].map(formatCsvField).join(',');
+                    csvContent += row + "\n";
                 } else {
                     binData.items.forEach(item => {
-                        csvContent += [
+                        const row = [
                             orderNumber, binData.name, binData.tracking,
-                            formatAsExcelText(item.code), formatAsExcelText(item.barcode),
-                            `"${item.name.replace(/"/g, '""')}"`, item.quantity
-                        ].join(',') + "\n";
+                            item.code, item.barcode, item.name, item.quantity
+                        ].map(formatCsvField).join(',');
+                        csvContent += row + "\n";
                     });
                 }
             });
+
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -664,10 +726,103 @@
             setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
             btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
         }
+        
+        function exportThermalLabelsPDF() {
+            if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
+            const btn = document.getElementById('export-thermal-pdf-btn');
+            btn.disabled = true; btn.textContent = '準備預覽...';
+            const orderNumber = orderNumberInput.value.trim() || 'N/A';
+            const printStyles = `<style>
+                @page {
+                    size: 100mm 150mm;
+                    margin: 5mm;
+                }
+                @media print {
+                    body { margin: 0; -webkit-print-color-adjust: exact; }
+                }
+                * { box-sizing: border-box; }
+                body { font-family: 'Helvetica', 'Arial', 'Microsoft JhengHei', sans-serif; }
+                .thermal-label {
+                    width: 90mm; /* 100mm - 2*5mm margins */
+                    height: 140mm; /* 150mm - 2*5mm margins */
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    page-break-after: always;
+                    border: 1px dashed #ccc; /* For screen preview */
+                    margin: 5mm auto; /* For screen preview */
+                }
+                .thermal-label:last-child { page-break-after: auto; }
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; }
+                .header h1 { margin: 0 0 5px 0; font-size: 24pt; }
+                .header p { margin: 0; font-size: 12pt; }
+                .content { flex-grow: 1; margin-top: 5px; overflow: hidden; }
+                .content table { width: 100%; border-collapse: collapse; }
+                .content th, .content td { border: 1px solid #999; padding: 4px; text-align: left; font-size: 10pt; line-height: 1.3; }
+                .content th { background-color: #f2f2f2; }
+                .footer { border-top: 2px solid #000; padding-top: 5px; text-align: center; }
+                .footer p { font-size: 12pt; margin: 3px 0; font-weight: bold; }
+                .footer .tracking-number { font-size: 11pt; margin-top: 5px; }
+            </style>`;
+            
+            let contentHTML = ``;
+            const binsArray = Array.from(AppState.bins.values());
+            const totalBins = binsArray.length;
+            binsArray.forEach((binData, binIndex) => {
+                const itemsArray = Array.from(binData.items.values());
+                const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
+                const chunkSize = 18; // 根據熱感紙高度和字體大小估算，每頁大約可放18個項目
+                const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
+                
+                for (let i = 0; i < totalPagesForBin; i++) {
+                    const itemChunk = itemsArray.slice(i * chunkSize, (i + 1) * chunkSize);
+                    const newTitle = `第 ${totalBins}-${binIndex + 1} 箱`;
+                    const pageInfo = `(${i + 1}/${totalPagesForBin})`;
+
+                    contentHTML += `<div class="thermal-label">`;
+                    contentHTML += `
+                        <div class="header">
+                            <h1>${newTitle} <span style="font-size: 60%;">${pageInfo}</span></h1>
+                            <p><strong>訂單號碼:</strong> ${orderNumber}</p>
+                        </div>
+                    `;
+                    contentHTML += `<div class="content"><table><thead><tr><th style="width:80%">品項名稱</th><th style="text-align:center;">數量</th></tr></thead><tbody>`;
+
+                    if (itemChunk.length > 0) {
+                        itemChunk.forEach(item => {
+                            contentHTML += `<tr><td>${item.name}</td><td style="text-align:center;">${item.quantity}</td></tr>`;
+                        });
+                    } else {
+                        contentHTML += `<tr><td colspan="2" style="text-align:center;height:100mm;">此箱無商品</td></tr>`;
+                    }
+
+                    contentHTML += `</tbody></table></div>`;
+                    contentHTML += `
+                        <div class="footer">
+                            <p>本箱總計: ${binTotal} 件</p>
+                            <p class="tracking-number">運單號: ${binData.tracking || '______________________'}</p>
+                        </div>
+                    `;
+                    contentHTML += `</div>`;
+                }
+            });
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
+                btn.disabled = false; btn.textContent = '匯出 熱感紙 (10x15)';
+                return;
+            }
+            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>列印熱感應標籤 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
+            btn.disabled = false; btn.textContent = '匯出 熱感紙 (10x15)';
+        }
 
         exportBtn.addEventListener('click', exportCSV);
         exportA4PdfBtn.addEventListener('click', exportA4PDF);
         exportA5PdfBtn.addEventListener('click', exportA5BoxLabelsPDF);
+        exportThermalPdfBtn.addEventListener('click', exportThermalLabelsPDF);
     }
     setupExports();
     
