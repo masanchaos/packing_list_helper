@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V78 - 智慧計算修正版)</title>
+    <title>智慧拖拽分箱工具 (V79 - 版面修正最終版)</title>
     <style>
         /* --- 全局與佈局 --- */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
@@ -724,19 +724,9 @@
             btn.disabled = true; btn.textContent = '準備預覽...';
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
 
-            // --- 智慧計算核心邏輯 ---
-            // 這些是基於 CSS 樣式的估算值，單位為 mm。如果調整了 CSS，可能需要同步修改這裡。
-            const LABEL_TOTAL_HEIGHT_MM = 140; // 標籤內容可用總高度 (150mm 紙張高度 - 5mm*2 邊距)
-            const HEADER_ESTIMATED_HEIGHT_MM = 20; // 頁首的估計高度
-            const FOOTER_ESTIMATED_HEIGHT_MM = 15; // 頁尾的估計高度
-            const ITEM_ROW_HEIGHT_MM = 7; // 單一品項列的固定高度 (包含內距)
-
-            // 計算可容納品項的實際空間
-            const availableContentHeight = LABEL_TOTAL_HEIGHT_MM - HEADER_ESTIMATED_HEIGHT_MM - FOOTER_ESTIMATED_HEIGHT_MM;
-            
-            // 動態計算每頁可以容納的品項數 (chunkSize)
-            const chunkSize = Math.floor(availableContentHeight / ITEM_ROW_HEIGHT_MM);
-            // --- 智慧計算核心邏輯結束 ---
+            // 根據您的截圖和實際測試，我們放棄不穩定的高度估算，
+            // 改為使用一個固定且安全的品項數量，以確保內容不會被裁切。
+            const chunkSize = 13;
 
             const printStyles = `<style>
                 @page {
