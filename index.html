@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V73 - 指令升級版)</title>
+    <title>智慧拖拽分箱工具 (V74 - 列印優化版)</title>
     <style>
         /* --- 全局與佈局 --- */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
@@ -283,7 +283,6 @@
         modalCallback = null;
     }
 
-    // === 修改: 參數改為直接接收 targetId ===
     function showChoiceModal(results, quantityToMove, sourceId, targetId) {
         choiceList.innerHTML = '';
         results.forEach(item => {
@@ -298,7 +297,6 @@
                     showToast(`移動數量 (${quantityToMove}) 超過所選商品剩餘數量 (${selectedItem.quantity})！`, 'error');
                     return;
                 }
-                // 直接使用傳入的 targetId
                 moveItem(item.code, sourceId, targetId, quantityToMove);
                 showToast(`已對您選擇的 "${item.name}" 執行操作。`, 'success');
             });
@@ -492,9 +490,8 @@
     choiceCancelBtn.addEventListener('click', hideChoiceModal);
 
     // --- 快速指令 ---
-    // === 修改: 全面升級指令解析邏輯 ===
     function processCommand(commandText) {
-        const tokens = commandText.trim().split(/\s+/).filter(Boolean); // 過濾空字串
+        const tokens = commandText.trim().split(/\s+/).filter(Boolean);
         if (tokens.length < 3) {
             showToast("指令格式錯誤！請檢查格式。", 'error');
             return false;
@@ -503,12 +500,10 @@
         let sourceId, targetId, searchTerm, quantityToMove;
         const isNumeric = (str) => str !== null && str.trim() !== '' && !isNaN(str) && !isNaN(parseFloat(str));
 
-        const L1 = tokens[tokens.length - 1]; // 最後一個
-        const L2 = tokens[tokens.length - 2]; // 倒數第二個
-        const L3 = tokens.length >= 3 ? tokens[tokens.length - 3] : null; // 倒數第三個
+        const L1 = tokens[tokens.length - 1];
+        const L2 = tokens[tokens.length - 2];
+        const L3 = tokens.length >= 3 ? tokens[tokens.length - 3] : null;
 
-        // 模式一: 箱子之間移動 或 從箱子移回待分箱區
-        // 格式: [關鍵字...] [數量] [來源箱] [去向箱/0]
         if (tokens.length >= 4 && isNumeric(L1) && isNumeric(L2) && isNumeric(L3)) {
             const fromBinNum = L2;
             const toBinNum = L1;
@@ -528,8 +523,6 @@
             quantityToMove = parseInt(L3);
             searchTerm = tokens.slice(0, tokens.length - 3).join(' ');
         } 
-        // 模式二: 從待分箱區移到箱子
-        // 格式: [關鍵字...] [數量] [去向箱]
         else if (isNumeric(L1) && isNumeric(L2)) {
             const toBinNum = L1;
             sourceId = 'pool';
@@ -541,13 +534,11 @@
             quantityToMove = parseInt(L2);
             searchTerm = tokens.slice(0, tokens.length - 2).join(' ');
         }
-        // 無法識別的格式
         else {
             showToast("指令格式無法識別！\n請使用: (詞 數 去向箱) 或 (詞 數 來源箱 去向箱/0)", "error");
             return false;
         }
         
-        // --- 後續執行邏輯 ---
         const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId)?.items;
 
         if (!sourceMap) { showToast(`指令錯誤：找不到來源「${sourceId}」！`, 'error'); return false; }
@@ -608,7 +599,7 @@
         function exportCSV() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
-            let csvContent = "\uFEFF"; // BOM for Excel to recognize UTF-8
+            let csvContent = "\uFEFF";
             csvContent += "訂單號碼,箱號,運單號,商品編號,國際條碼,品項名稱,數量\n";
 
             const formatCsvField = (value) => {
@@ -727,6 +718,7 @@
             btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
         }
         
+        // === 修改: 優化熱感紙列印樣式 ===
         function exportThermalLabelsPDF() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
             const btn = document.getElementById('export-thermal-pdf-btn');
@@ -738,19 +730,19 @@
                     margin: 5mm;
                 }
                 @media print {
-                    body { margin: 0; -webkit-print-color-adjust: exact; }
+                    body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
                 }
                 * { box-sizing: border-box; }
                 body { font-family: 'Helvetica', 'Arial', 'Microsoft JhengHei', sans-serif; }
                 .thermal-label {
-                    width: 90mm; /* 100mm - 2*5mm margins */
-                    height: 140mm; /* 150mm - 2*5mm margins */
-                    padding: 0;
+                    width: 90mm;
+                    height: 140mm;
+                    padding: 3mm; /* 新增內距作為安全緩衝區 */
                     display: flex;
                     flex-direction: column;
                     page-break-after: always;
-                    border: 1px dashed #ccc; /* For screen preview */
-                    margin: 5mm auto; /* For screen preview */
+                    border: 1px dashed #ccc;
+                    margin: 5mm auto;
                 }
                 .thermal-label:last-child { page-break-after: auto; }
                 .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; }
@@ -771,7 +763,7 @@
             binsArray.forEach((binData, binIndex) => {
                 const itemsArray = Array.from(binData.items.values());
                 const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
-                const chunkSize = 18; // 根據熱感紙高度和字體大小估算，每頁大約可放18個項目
+                const chunkSize = 18;
                 const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
                 
                 for (let i = 0; i < totalPagesForBin; i++) {
