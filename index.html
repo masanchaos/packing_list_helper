@@ -1,738 +1,735 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V77 - 智慧計算版)</title>
-    <style>
-        /* --- 全局與佈局 --- */
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
-        .container { display: flex; width: 100%; padding: 20px; gap: 20px; }
-        .panel { background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        #item-pool-container { flex: 1; }
-        #bin-area-container { flex: 2; }
-        h2 { text-align: center; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin: 20px; }
-        
-        /* --- 控制項 --- */
-        .controls { padding: 20px; border-bottom: 2px solid #eee; }
-        textarea { width: calc(100% - 22px); height: 100px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-size: 14px; }
-        .button-group { display: flex; flex-wrap: wrap; gap: 10px; }
-        button { padding: 10px 15px; border: none; border-radius: 4px; background-color: #007bff; color: white; cursor: pointer; font-size: 16px; transition: background-color 0.2s; }
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #a77c81; cursor: not-allowed; }
-        #export-btn { background-color: #28a745; }
-        #export-btn:hover { background-color: #218838; }
-        #export-a4-pdf-btn { background-color: #17a2b8; }
-        #export-a4-pdf-btn:hover { background-color: #138496; }
-        #export-a5-pdf-btn { background-color: #fd7e14; }
-        #export-a5-pdf-btn:hover { background-color: #e86a02; }
-        #export-thermal-pdf-btn { background-color: #6f42c1; }
-        #export-thermal-pdf-btn:hover { background-color: #5a359a; }
-        #clear-data-btn { background-color: #dc3545; }
-        #clear-data-btn:hover { background-color: #c82333; }
-        #quick-add-bins-btn { background-color: #20c997; }
-        #quick-add-bins-btn:hover { background-color: #1baa80; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧拖拽分箱工具 (V78 - 智慧計算修正版)</title>
+    <style>
+        /* --- 全局與佈局 --- */
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
+        .container { display: flex; width: 100%; padding: 20px; gap: 20px; }
+        .panel { background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        #item-pool-container { flex: 1; }
+        #bin-area-container { flex: 2; }
+        h2 { text-align: center; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin: 20px; }
+        
+        /* --- 控制項 --- */
+        .controls { padding: 20px; border-bottom: 2px solid #eee; }
+        textarea { width: calc(100% - 22px); height: 100px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-size: 14px; }
+        .button-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        button { padding: 10px 15px; border: none; border-radius: 4px; background-color: #007bff; color: white; cursor: pointer; font-size: 16px; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #a77c81; cursor: not-allowed; }
+        #export-btn { background-color: #28a745; }
+        #export-btn:hover { background-color: #218838; }
+        #export-a4-pdf-btn { background-color: #17a2b8; }
+        #export-a4-pdf-btn:hover { background-color: #138496; }
+        #export-a5-pdf-btn { background-color: #fd7e14; }
+        #export-a5-pdf-btn:hover { background-color: #e86a02; }
+        #export-thermal-pdf-btn { background-color: #6f42c1; }
+        #export-thermal-pdf-btn:hover { background-color: #5a359a; }
+        #clear-data-btn { background-color: #dc3545; }
+        #clear-data-btn:hover { background-color: #c82333; }
+        #quick-add-bins-btn { background-color: #20c997; }
+        #quick-add-bins-btn:hover { background-color: #1baa80; }
 
-        /* --- 列表與輸入框 --- */
-        .list-header { padding: 0 20px; }
-        .list-header h2, #bin-area-title { display: flex; justify-content: space-between; align-items: center; }
-        .item-count { background-color: #6c757d; color: white; font-size: 14px; padding: 2px 8px; border-radius: 10px; }
-        #search-box, .order-input input, .command-group input { width: calc(100% - 22px); padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; margin-bottom: 10px; }
-        .order-input, .command-group { padding: 20px 20px 0 20px; }
-        .order-input label, .command-group label { font-weight: bold; margin-right: 10px; display: block; margin-bottom: 5px;}
-        #item-list-content { flex-grow: 1; overflow-y: auto; padding: 20px; border: 2px dashed transparent; transition: border-color 0.2s, background-color 0.2s; }
-        #bin-area { flex-grow: 1; overflow-y: auto; padding: 0 20px 20px 20px; }
+        /* --- 列表與輸入框 --- */
+        .list-header { padding: 0 20px; }
+        .list-header h2, #bin-area-title { display: flex; justify-content: space-between; align-items: center; }
+        .item-count { background-color: #6c757d; color: white; font-size: 14px; padding: 2px 8px; border-radius: 10px; }
+        #search-box, .order-input input, .command-group input { width: calc(100% - 22px); padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; margin-bottom: 10px; }
+        .order-input, .command-group { padding: 20px 20px 0 20px; }
+        .order-input label, .command-group label { font-weight: bold; margin-right: 10px; display: block; margin-bottom: 5px;}
+        #item-list-content { flex-grow: 1; overflow-y: auto; padding: 20px; border: 2px dashed transparent; transition: border-color 0.2s, background-color 0.2s; }
+        #bin-area { flex-grow: 1; overflow-y: auto; padding: 0 20px 20px 20px; }
 
-        /* --- 商品與箱子項目 --- */
-        .item { background-color: #e9f7fd; border: 1px solid #bde0fe; border-radius: 4px; padding: 10px; margin-bottom: 10px; cursor: grab; user-select: none; transition: opacity 0.2s; }
-        .item:active { cursor: grabbing; }
-        .item.dragging { opacity: 0.5; }
-        .item strong { color: #0d6efd; }
-        .item .details { font-size: 12px; color: #555; }
-        .bin { background-color: #f8f9fa; border: 2px dashed #ccc; border-radius: 8px; padding: 10px; margin-bottom: 20px; min-height: 100px; transition: background-color 0.2s, border-color 0.2s; }
-        .bin h3 { margin: 0 0 10px 0; color: #666; display: flex; justify-content: space-between; align-items: center; }
-        .delete-bin-btn { color: #dc3545; cursor: pointer; font-weight: bold; padding: 2px 5px; border-radius: 4px; }
-        .delete-bin-btn:hover { background-color: #f8d7da; }
-        .bin .tracking-input { width: calc(100% - 22px); margin-bottom: 10px; padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; }
-        .drag-over { background-color: #e2e6ea; border-color: #007bff !important; }
-        
-        /* --- 彈出視窗 (Modal) --- */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 350px; text-align: center; }
-        .modal-content h3 { margin-top: 0; }
-        .modal-content input { width: 80%; padding: 8px; margin: 10px 0 20px 0; text-align: center; font-size: 18px; }
+        /* --- 商品與箱子項目 --- */
+        .item { background-color: #e9f7fd; border: 1px solid #bde0fe; border-radius: 4px; padding: 10px; margin-bottom: 10px; cursor: grab; user-select: none; transition: opacity 0.2s; }
+        .item:active { cursor: grabbing; }
+        .item.dragging { opacity: 0.5; }
+        .item strong { color: #0d6efd; }
+        .item .details { font-size: 12px; color: #555; }
+        .bin { background-color: #f8f9fa; border: 2px dashed #ccc; border-radius: 8px; padding: 10px; margin-bottom: 20px; min-height: 100px; transition: background-color 0.2s, border-color 0.2s; }
+        .bin h3 { margin: 0 0 10px 0; color: #666; display: flex; justify-content: space-between; align-items: center; }
+        .delete-bin-btn { color: #dc3545; cursor: pointer; font-weight: bold; padding: 2px 5px; border-radius: 4px; }
+        .delete-bin-btn:hover { background-color: #f8d7da; }
+        .bin .tracking-input { width: calc(100% - 22px); margin-bottom: 10px; padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .drag-over { background-color: #e2e6ea; border-color: #007bff !important; }
+        
+        /* --- 彈出視窗 (Modal) --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 350px; text-align: center; }
+        .modal-content h3 { margin-top: 0; }
+        .modal-content input { width: 80%; padding: 8px; margin: 10px 0 20px 0; text-align: center; font-size: 18px; }
 
-        /* --- Toast 通知 --- */
-        .toast-notification { position: fixed; bottom: 20px; right: 20px; background-color: #333; color: white; padding: 12px 20px; border-radius: 6px; z-index: 2000; opacity: 0; transition: opacity 0.3s, bottom 0.3s; pointer-events: none; }
-        .toast-notification.show { opacity: 1; bottom: 30px; }
-        .toast-notification.error { background-color: #dc3545; }
-        .toast-notification.success { background-color: #28a745; }
+        /* --- Toast 通知 --- */
+        .toast-notification { position: fixed; bottom: 20px; right: 20px; background-color: #333; color: white; padding: 12px 20px; border-radius: 6px; z-index: 2000; opacity: 0; transition: opacity 0.3s, bottom 0.3s; pointer-events: none; }
+        .toast-notification.show { opacity: 1; bottom: 30px; }
+        .toast-notification.error { background-color: #dc3545; }
+        .toast-notification.success { background-color: #28a745; }
 
-        /* --- 選擇視窗樣式 --- */
-        #choice-list .choice-item {
-            padding: 10px 12px; border: 1px solid #ddd; border-radius: 4px;
-            margin-bottom: 8px; cursor: pointer; text-align: left; transition: background-color 0.2s;
-        }
-        #choice-list .choice-item:hover { background-color: #f0f8ff; }
-        #choice-list .choice-item .details { font-size: 12px; color: #555; margin-top: 4px; }
-    </style>
+        /* --- 選擇視窗樣式 --- */
+        #choice-list .choice-item {
+            padding: 10px 12px; border: 1px solid #ddd; border-radius: 4px;
+            margin-bottom: 8px; cursor: pointer; text-align: left; transition: background-color 0.2s;
+        }
+        #choice-list .choice-item:hover { background-color: #f0f8ff; }
+        #choice-list .choice-item .details { font-size: 12px; color: #555; margin-top: 4px; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div id="item-pool-container" class="panel">
-            <div class="order-input"><label for="order-number-input">訂單號碼:</label><input type="text" id="order-number-input" placeholder="請在此輸入本次作業的訂單號碼"></div>
-            <div class="controls"><textarea id="data-input" placeholder="1. 在此貼上商品資料..."></textarea><div class="button-group"><button id="parse-btn">解析資料</button><button id="clear-data-btn">清除全部資料</button></div></div>
-            <div class="command-group"><label for="command-input">快速指令:</label><div style="display:flex; gap: 10px;">
-                <input type="text" id="command-input" placeholder="詞 數 [來源箱] 去向箱(0=待分箱區)" style="margin-bottom:0; flex-grow:1;" title="範例:&#10;從待分箱區移出: '商品A 5 1' (5個商品A移到第1箱)&#10;從箱子移回待分箱區: '商品A 3 2 0' (3個商品A從第2箱移回)&#10;箱子之間移動: '商品A 2 1 3' (2個商品A從第1箱移到第3箱)">
-                <button id="execute-command-btn">執行</button>
-            </div></div>
-            <div class="list-header"><h2 id="pool-title">待分箱區</h2><input type="text" id="search-box" placeholder="🔍 在此透過關鍵字篩選商品 (可用 、 分隔)" style="margin: 0 20px 10px 20px; width: calc(100% - 40px);"></div>
-            <div id="item-list-content"></div>
-        </div>
-        <div id="bin-area-container" class="panel">
-            <div class="controls" id="bin-controls">
-                <div class="button-group">
-                    <button id="add-bin-btn">新增箱子</button>
-                    <button id="quick-add-bins-btn">快速生成多箱</button>
-                    <button id="export-btn">匯出 CSV</button>
-                    <button id="export-a4-pdf-btn">匯出 PDF (A4總表)</button>
-                    <button id="export-a5-pdf-btn">匯出 PDF (A5箱貼)</button>
-                    <button id="export-thermal-pdf-btn">匯出 熱感紙 (10x15)</button>
-                </div>
-            </div>
-            <div id="bin-area-title-wrapper"></div>
-            <div id="bin-area" class="bin-list"></div>
-        </div>
-    </div>
-    <div id="quantity-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 id="modal-title">確認數量</h3>
-            <p>要將多少數量的 "<span id="modal-item-name"></span>" 放入此箱？</p>
-            <input type="number" id="modal-quantity-input" min="1">
-            <div class="button-group" style="justify-content: center;">
-                <button id="modal-confirm-btn">確認</button>
-                <button id="modal-cancel-btn" style="background-color: #6c757d;">取消</button>
-            </div>
-        </div>
-    </div>
-    <div id="choice-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>發現多個符合項目</h3>
-            <p>請選擇您要操作的確切商品：</p>
-            <div id="choice-list" style="max-height: 200px; overflow-y: auto; margin: 15px 0;"></div>
-            <button id="choice-cancel-btn" style="background-color: #6c757d; margin-top: 10px; width: 100%;">取消</button>
-        </div>
-    </div>
+    <div class="container">
+        <div id="item-pool-container" class="panel">
+            <div class="order-input"><label for="order-number-input">訂單號碼:</label><input type="text" id="order-number-input" placeholder="請在此輸入本次作業的訂單號碼"></div>
+            <div class="controls"><textarea id="data-input" placeholder="1. 在此貼上商品資料..."></textarea><div class="button-group"><button id="parse-btn">解析資料</button><button id="clear-data-btn">清除全部資料</button></div></div>
+            <div class="command-group"><label for="command-input">快速指令:</label><div style="display:flex; gap: 10px;">
+                <input type="text" id="command-input" placeholder="詞 數 [來源箱] 去向箱(0=待分箱區)" style="margin-bottom:0; flex-grow:1;" title="範例:&#10;從待分箱區移出: '商品A 5 1' (5個商品A移到第1箱)&#10;從箱子移回待分箱區: '商品A 3 2 0' (3個商品A從第2箱移回)&#10;箱子之間移動: '商品A 2 1 3' (2個商品A從第1箱移到第3箱)">
+                <button id="execute-command-btn">執行</button>
+            </div></div>
+            <div class="list-header"><h2 id="pool-title">待分箱區</h2><input type="text" id="search-box" placeholder="🔍 在此透過關鍵字篩選商品 (可用 、 分隔)" style="margin: 0 20px 10px 20px; width: calc(100% - 40px);"></div>
+            <div id="item-list-content"></div>
+        </div>
+        <div id="bin-area-container" class="panel">
+            <div class="controls" id="bin-controls">
+                <div class="button-group">
+                    <button id="add-bin-btn">新增箱子</button>
+                    <button id="quick-add-bins-btn">快速生成多箱</button>
+                    <button id="export-btn">匯出 CSV</button>
+                    <button id="export-a4-pdf-btn">匯出 PDF (A4總表)</button>
+                    <button id="export-a5-pdf-btn">匯出 PDF (A5箱貼)</button>
+                    <button id="export-thermal-pdf-btn">匯出 熱感紙 (10x15)</button>
+                </div>
+            </div>
+            <div id="bin-area-title-wrapper"></div>
+            <div id="bin-area" class="bin-list"></div>
+        </div>
+    </div>
+    <div id="quantity-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title">確認數量</h3>
+            <p>要將多少數量的 "<span id="modal-item-name"></span>" 放入此箱？</p>
+            <input type="number" id="modal-quantity-input" min="1">
+            <div class="button-group" style="justify-content: center;">
+                <button id="modal-confirm-btn">確認</button>
+                <button id="modal-cancel-btn" style="background-color: #6c757d;">取消</button>
+            </div>
+        </div>
+    </div>
+    <div id="choice-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>發現多個符合項目</h3>
+            <p>請選擇您要操作的確切商品：</p>
+            <div id="choice-list" style="max-height: 200px; overflow-y: auto; margin: 15px 0;"></div>
+            <button id="choice-cancel-btn" style="background-color: #6c757d; margin-top: 10px; width: 100%;">取消</button>
+        </div>
+    </div>
 
 <script>
-    // --- DOM 元素獲取 ---
-    const orderNumberInput = document.getElementById('order-number-input');
-    const dataInput = document.getElementById('data-input');
-    const parseBtn = document.getElementById('parse-btn');
-    const addBinBtn = document.getElementById('add-bin-btn');
-    const clearDataBtn = document.getElementById('clear-data-btn');
-    const quickAddBinsBtn = document.getElementById('quick-add-bins-btn');
-    const itemListContent = document.getElementById('item-list-content');
-    const binArea = document.getElementById('bin-area');
-    const searchBox = document.getElementById('search-box');
-    const commandInput = document.getElementById('command-input');
-    const executeCommandBtn = document.getElementById('execute-command-btn');
-    const poolTitle = document.getElementById('pool-title');
-    const binAreaTitleWrapper = document.getElementById('bin-area-title-wrapper');
-    const binAreaTitle = document.createElement('h2');
-    binAreaTitle.id = 'bin-area-title';
-    binAreaTitleWrapper.appendChild(binAreaTitle);
-    const quantityModal = document.getElementById('quantity-modal');
-    const modalItemName = document.getElementById('modal-item-name');
-    const modalQuantityInput = document.getElementById('modal-quantity-input');
-    const modalConfirmBtn = document.getElementById('modal-confirm-btn');
-    const modalCancelBtn = document.getElementById('modal-cancel-btn');
-    const choiceModal = document.getElementById('choice-modal');
-    const choiceList = document.getElementById('choice-list');
-    const choiceCancelBtn = document.getElementById('choice-cancel-btn');
-    
-    let AppState = { pool: new Map(), bins: new Map() };
-    let binCounter = 0;
-    let currentSearchTerm = '';
-    let modalCallback = null;
+    // --- DOM 元素獲取 ---
+    const orderNumberInput = document.getElementById('order-number-input');
+    const dataInput = document.getElementById('data-input');
+    const parseBtn = document.getElementById('parse-btn');
+    const addBinBtn = document.getElementById('add-bin-btn');
+    const clearDataBtn = document.getElementById('clear-data-btn');
+    const quickAddBinsBtn = document.getElementById('quick-add-bins-btn');
+    const itemListContent = document.getElementById('item-list-content');
+    const binArea = document.getElementById('bin-area');
+    const searchBox = document.getElementById('search-box');
+    const commandInput = document.getElementById('command-input');
+    const executeCommandBtn = document.getElementById('execute-command-btn');
+    const poolTitle = document.getElementById('pool-title');
+    const binAreaTitleWrapper = document.getElementById('bin-area-title-wrapper');
+    const binAreaTitle = document.createElement('h2');
+    binAreaTitle.id = 'bin-area-title';
+    binAreaTitleWrapper.appendChild(binAreaTitle);
+    const quantityModal = document.getElementById('quantity-modal');
+    const modalItemName = document.getElementById('modal-item-name');
+    const modalQuantityInput = document.getElementById('modal-quantity-input');
+    const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+    const modalCancelBtn = document.getElementById('modal-cancel-btn');
+    const choiceModal = document.getElementById('choice-modal');
+    const choiceList = document.getElementById('choice-list');
+    const choiceCancelBtn = document.getElementById('choice-cancel-btn');
+    
+    let AppState = { pool: new Map(), bins: new Map() };
+    let binCounter = 0;
+    let currentSearchTerm = '';
+    let modalCallback = null;
 
-    // --- 核心渲染函式 ---
-    function render() {
-        itemListContent.innerHTML = '';
-        const searchKeywords = currentSearchTerm.split(/[,、\s]+/).filter(Boolean);
-        const itemsToRender = Array.from(AppState.pool.values()).filter(item => {
-            if (searchKeywords.length === 0) return true;
-            const itemText = `${item.name} ${item.code} ${item.barcode}`.toLowerCase();
-            return searchKeywords.some(keyword => itemText.includes(keyword));
-        });
-        itemsToRender.forEach(item => { itemListContent.appendChild(createItemElement(item, 'pool')); });
-        binArea.innerHTML = '';
-        AppState.bins.forEach((binData, binId) => {
-            const binEl = document.createElement('div');
-            binEl.className = 'bin';
-            binEl.dataset.binId = binId;
-            const title = document.createElement('h3');
-            title.innerHTML = `${binData.name} <span class="delete-bin-btn" title="刪除此箱">[X]</span>`;
-            const trackingInput = document.createElement('input');
-            trackingInput.type = 'text';
-            trackingInput.className = 'tracking-input';
-            trackingInput.placeholder = '請在此輸入運單號...';
-            trackingInput.value = binData.tracking;
-            trackingInput.addEventListener('input', (e) => { 
-                AppState.bins.get(binId).tracking = e.target.value; 
-                saveStateToLocalStorage();
-            });
-            binEl.appendChild(title);
-            binEl.appendChild(trackingInput);
-            binData.items.forEach(item => {
-                binEl.appendChild(createItemElement(item, binId));
-            });
-            binArea.appendChild(binEl);
-        });
-        updateCounts();
-    }
-    
-    // --- 核心與輔助函式 ---
-    function createItemElement(item, source) {
-        const itemEl = document.createElement('div');
-        itemEl.className = 'item';
-        itemEl.draggable = true;
-        itemEl.dataset.code = item.code;
-        itemEl.dataset.source = source;
-        itemEl.innerHTML = `<strong>${item.name}</strong><div class="details">(編號: ${item.code}, 條碼: ${item.barcode}, 數量: ${item.quantity})</div>`;
-        return itemEl;
-    }
+    // --- 核心渲染函式 ---
+    function render() {
+        itemListContent.innerHTML = '';
+        const searchKeywords = currentSearchTerm.split(/[,、\s]+/).filter(Boolean);
+        const itemsToRender = Array.from(AppState.pool.values()).filter(item => {
+            if (searchKeywords.length === 0) return true;
+            const itemText = `${item.name} ${item.code} ${item.barcode}`.toLowerCase();
+            return searchKeywords.some(keyword => itemText.includes(keyword));
+        });
+        itemsToRender.forEach(item => { itemListContent.appendChild(createItemElement(item, 'pool')); });
+        binArea.innerHTML = '';
+        AppState.bins.forEach((binData, binId) => {
+            const binEl = document.createElement('div');
+            binEl.className = 'bin';
+            binEl.dataset.binId = binId;
+            const title = document.createElement('h3');
+            title.innerHTML = `${binData.name} <span class="delete-bin-btn" title="刪除此箱">[X]</span>`;
+            const trackingInput = document.createElement('input');
+            trackingInput.type = 'text';
+            trackingInput.className = 'tracking-input';
+            trackingInput.placeholder = '請在此輸入運單號...';
+            trackingInput.value = binData.tracking;
+            trackingInput.addEventListener('input', (e) => { 
+                AppState.bins.get(binId).tracking = e.target.value; 
+                saveStateToLocalStorage();
+            });
+            binEl.appendChild(title);
+            binEl.appendChild(trackingInput);
+            binData.items.forEach(item => {
+                binEl.appendChild(createItemElement(item, binId));
+            });
+            binArea.appendChild(binEl);
+        });
+        updateCounts();
+    }
+    
+    // --- 核心與輔助函式 ---
+    function createItemElement(item, source) {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'item';
+        itemEl.draggable = true;
+        itemEl.dataset.code = item.code;
+        itemEl.dataset.source = source;
+        itemEl.innerHTML = `<strong>${item.name}</strong><div class="details">(編號: ${item.code}, 條碼: ${item.barcode}, 數量: ${item.quantity})</div>`;
+        return itemEl;
+    }
 
-    function updateCounts() {
-        const poolTotal = Array.from(AppState.pool.values()).reduce((sum, item) => sum + (item.quantity || 0), 0);
-        poolTitle.innerHTML = `待分箱區 <span class="item-count">${poolTotal}</span>`;
-        let binsTotal = 0;
-        AppState.bins.forEach((binData, binId) => {
-            const binTotal = Array.from(binData.items.values()).reduce((sum, item) => sum + (item.quantity || 0), 0);
-            binsTotal += binTotal;
-            const binEl = binArea.querySelector(`.bin[data-bin-id="${binId}"]`);
-            if (binEl) {
-                const titleEl = binEl.querySelector('h3');
-                if (titleEl){
-                    const deleteBtnHTML = titleEl.querySelector('.delete-bin-btn')?.outerHTML || '';
-                    titleEl.innerHTML = `${binData.name} <span class="item-count">${binTotal}</span> ${deleteBtnHTML}`;
-                }
-            }
-        });
-        binAreaTitle.innerHTML = `分箱工作區 <span class="item-count">${binsTotal}</span>`;
-    }
+    function updateCounts() {
+        const poolTotal = Array.from(AppState.pool.values()).reduce((sum, item) => sum + (item.quantity || 0), 0);
+        poolTitle.innerHTML = `待分箱區 <span class="item-count">${poolTotal}</span>`;
+        let binsTotal = 0;
+        AppState.bins.forEach((binData, binId) => {
+            const binTotal = Array.from(binData.items.values()).reduce((sum, item) => sum + (item.quantity || 0), 0);
+            binsTotal += binTotal;
+            const binEl = binArea.querySelector(`.bin[data-bin-id="${binId}"]`);
+            if (binEl) {
+                const titleEl = binEl.querySelector('h3');
+                if (titleEl){
+                    const deleteBtnHTML = titleEl.querySelector('.delete-bin-btn')?.outerHTML || '';
+                    titleEl.innerHTML = `${binData.name} <span class="item-count">${binTotal}</span> ${deleteBtnHTML}`;
+                }
+            }
+        });
+        binAreaTitle.innerHTML = `分箱工作區 <span class="item-count">${binsTotal}</span>`;
+    }
 
-    function moveItem(itemCode, sourceId, targetId, quantityToMove) {
-        const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId)?.items;
-        const targetMap = (targetId === 'pool') ? AppState.pool : AppState.bins.get(targetId)?.items;
-        if (!sourceMap || !targetMap || !sourceMap.has(itemCode)) { return; }
-        const itemToMove = sourceMap.get(itemCode);
-        const existingTargetItem = targetMap.get(itemCode);
-        if (existingTargetItem) {
-            existingTargetItem.quantity += quantityToMove;
-        } else {
-            targetMap.set(itemCode, { ...itemToMove, quantity: quantityToMove });
-        }
-        itemToMove.quantity -= quantityToMove;
-        if (itemToMove.quantity <= 0) {
-            sourceMap.delete(itemCode);
-        }
-        render();
-        saveStateToLocalStorage();
-    }
-    
-    function returnItemsToPool(items) {
-        items.forEach(itemToReturn => {
-            const existingPoolItem = AppState.pool.get(itemToReturn.code);
-            if (existingPoolItem) {
-                existingPoolItem.quantity += itemToReturn.quantity;
-            } else {
-                AppState.pool.set(itemToReturn.code, { ...itemToReturn });
-            }
-        });
-    }
+    function moveItem(itemCode, sourceId, targetId, quantityToMove) {
+        const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId)?.items;
+        const targetMap = (targetId === 'pool') ? AppState.pool : AppState.bins.get(targetId)?.items;
+        if (!sourceMap || !targetMap || !sourceMap.has(itemCode)) { return; }
+        const itemToMove = sourceMap.get(itemCode);
+        const existingTargetItem = targetMap.get(itemCode);
+        if (existingTargetItem) {
+            existingTargetItem.quantity += quantityToMove;
+        } else {
+            targetMap.set(itemCode, { ...itemToMove, quantity: quantityToMove });
+        }
+        itemToMove.quantity -= quantityToMove;
+        if (itemToMove.quantity <= 0) {
+            sourceMap.delete(itemCode);
+        }
+        render();
+        saveStateToLocalStorage();
+    }
+    
+    function returnItemsToPool(items) {
+        items.forEach(itemToReturn => {
+            const existingPoolItem = AppState.pool.get(itemToReturn.code);
+            if (existingPoolItem) {
+                existingPoolItem.quantity += itemToReturn.quantity;
+            } else {
+                AppState.pool.set(itemToReturn.code, { ...itemToReturn });
+            }
+        });
+    }
 
-    function reIndexBins() {
-        const newBins = new Map();
-        let newCounter = 1;
-        const sortedBinArray = Array.from(AppState.bins.entries()).sort((a, b) => parseInt(a[0].split('-')[1]) - parseInt(b[0].split('-')[1]));
-        sortedBinArray.forEach(([oldBinId, binData]) => {
-            const newBinId = `bin-${newCounter}`;
-            binData.name = `第 ${newCounter} 箱`;
-            newBins.set(newBinId, binData);
-            newCounter++;
-        });
-        AppState.bins = newBins;
-        binCounter = newBins.size;
-    }
-    
-    function showQuantityModal(item, sourceId, targetId) {
-        modalItemName.textContent = item.name;
-        modalQuantityInput.value = item.quantity;
-        modalQuantityInput.max = item.quantity;
-        quantityModal.style.display = 'flex';
-        modalQuantityInput.focus();
-        modalCallback = (amount) => {
-            moveItem(item.code, sourceId, targetId, amount);
-            modalCallback = null;
-        };
-    }
+    function reIndexBins() {
+        const newBins = new Map();
+        let newCounter = 1;
+        const sortedBinArray = Array.from(AppState.bins.entries()).sort((a, b) => parseInt(a[0].split('-')[1]) - parseInt(b[0].split('-')[1]));
+        sortedBinArray.forEach(([oldBinId, binData]) => {
+            const newBinId = `bin-${newCounter}`;
+            binData.name = `第 ${newCounter} 箱`;
+            newBins.set(newBinId, binData);
+            newCounter++;
+        });
+        AppState.bins = newBins;
+        binCounter = newBins.size;
+    }
+    
+    function showQuantityModal(item, sourceId, targetId) {
+        modalItemName.textContent = item.name;
+        modalQuantityInput.value = item.quantity;
+        modalQuantityInput.max = item.quantity;
+        quantityModal.style.display = 'flex';
+        modalQuantityInput.focus();
+        modalCallback = (amount) => {
+            moveItem(item.code, sourceId, targetId, amount);
+            modalCallback = null;
+        };
+    }
 
-    function hideQuantityModal() {
-        quantityModal.style.display = 'none';
-        modalCallback = null;
-    }
+    function hideQuantityModal() {
+        quantityModal.style.display = 'none';
+        modalCallback = null;
+    }
 
-    function showChoiceModal(results, quantityToMove, sourceId, targetId) {
-        choiceList.innerHTML = '';
-        results.forEach(item => {
-            const choiceEl = document.createElement('div');
-            choiceEl.className = 'choice-item';
-            choiceEl.innerHTML = `<strong>${item.name}</strong><div class="details">(編號: ${item.code})</div>`;
-            choiceEl.addEventListener('click', () => {
-                hideChoiceModal();
-                const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId).items;
-                const selectedItem = sourceMap.get(item.code);
-                if (quantityToMove > selectedItem.quantity) {
-                    showToast(`移動數量 (${quantityToMove}) 超過所選商品剩餘數量 (${selectedItem.quantity})！`, 'error');
-                    return;
-                }
-                moveItem(item.code, sourceId, targetId, quantityToMove);
-                showToast(`已對您選擇的 "${item.name}" 執行操作。`, 'success');
-            });
-            choiceList.appendChild(choiceEl);
-        });
-        choiceModal.style.display = 'flex';
-    }
+    function showChoiceModal(results, quantityToMove, sourceId, targetId) {
+        choiceList.innerHTML = '';
+        results.forEach(item => {
+            const choiceEl = document.createElement('div');
+            choiceEl.className = 'choice-item';
+            choiceEl.innerHTML = `<strong>${item.name}</strong><div class="details">(編號: ${item.code})</div>`;
+            choiceEl.addEventListener('click', () => {
+                hideChoiceModal();
+                const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId).items;
+                const selectedItem = sourceMap.get(item.code);
+                if (quantityToMove > selectedItem.quantity) {
+                    showToast(`移動數量 (${quantityToMove}) 超過所選商品剩餘數量 (${selectedItem.quantity})！`, 'error');
+                    return;
+                }
+                moveItem(item.code, sourceId, targetId, quantityToMove);
+                showToast(`已對您選擇的 "${item.name}" 執行操作。`, 'success');
+            });
+            choiceList.appendChild(choiceEl);
+        });
+        choiceModal.style.display = 'flex';
+    }
 
-    function hideChoiceModal() {
-        choiceModal.style.display = 'none';
-        choiceList.innerHTML = '';
-    }
+    function hideChoiceModal() {
+        choiceModal.style.display = 'none';
+        choiceList.innerHTML = '';
+    }
 
-    function intelligentParse(rawLines) {
-        const poolMap = new Map();
-        const isNumeric = (str) => str && !isNaN(str) && !isNaN(parseFloat(str));
-        const headers = new Set(["商品編號", "國際條碼", "品項名稱", "數量", "撿完剩"]);
-        let dataLines = rawLines.map(line => line.trim()).filter(line => line && line !== '圖' && !headers.has(line));
-        let i = 0; 
-        while (i < dataLines.length) {
-            let item = null;
-            if (i + 4 < dataLines.length && !isNumeric(dataLines[i + 2]) && isNumeric(dataLines[i + 3]) && isNumeric(dataLines[i + 4])) {
-                item = { code: dataLines[i], barcode: dataLines[i + 1] || 'NA', name: dataLines[i + 2], quantity: parseInt(dataLines[i + 3]) || 0 };
-                i += 5;
-            } else if (i + 3 < dataLines.length && !isNumeric(dataLines[i + 1]) && isNumeric(dataLines[i + 2]) && isNumeric(dataLines[i + 3])) {
-                item = { code: dataLines[i], barcode: 'NA', name: dataLines[i + 1], quantity: parseInt(dataLines[i + 2]) || 0 };
-                i += 4;
-            } else { i++; }
-            if (item) {
-                if (poolMap.has(item.code)) {
-                    poolMap.get(item.code).quantity += item.quantity;
-                } else {
-                    poolMap.set(item.code, item);
-                }
-            }
-        }
-        return poolMap;
-    }
+    function intelligentParse(rawLines) {
+        const poolMap = new Map();
+        const isNumeric = (str) => str && !isNaN(str) && !isNaN(parseFloat(str));
+        const headers = new Set(["商品編號", "國際條碼", "品項名稱", "數量", "撿完剩"]);
+        let dataLines = rawLines.map(line => line.trim()).filter(line => line && line !== '圖' && !headers.has(line));
+        let i = 0; 
+        while (i < dataLines.length) {
+            let item = null;
+            if (i + 4 < dataLines.length && !isNumeric(dataLines[i + 2]) && isNumeric(dataLines[i + 3]) && isNumeric(dataLines[i + 4])) {
+                item = { code: dataLines[i], barcode: dataLines[i + 1] || 'NA', name: dataLines[i + 2], quantity: parseInt(dataLines[i + 3]) || 0 };
+                i += 5;
+            } else if (i + 3 < dataLines.length && !isNumeric(dataLines[i + 1]) && isNumeric(dataLines[i + 2]) && isNumeric(dataLines[i + 3])) {
+                item = { code: dataLines[i], barcode: 'NA', name: dataLines[i + 1], quantity: parseInt(dataLines[i + 2]) || 0 };
+                i += 4;
+            } else { i++; }
+            if (item) {
+                if (poolMap.has(item.code)) {
+                    poolMap.get(item.code).quantity += item.quantity;
+                } else {
+                    poolMap.set(item.code, item);
+                }
+            }
+        }
+        return poolMap;
+    }
 
-    function clearAllData() {
-        if (confirm("您確定要清除所有資料嗎？\n這個操作無法復原，將會清空待分箱區、所有箱子和訂單號碼。")) {
-            AppState.pool.clear();
-            AppState.bins.clear();
-            binCounter = 0;
-            orderNumberInput.value = '';
-            dataInput.value = '';
-            searchBox.value = '';
-            currentSearchTerm = '';
-            localStorage.removeItem('binningToolState_v72');
-            render();
-            showToast("所有資料已成功清除。", 'success');
-        }
-    }
+    function clearAllData() {
+        if (confirm("您確定要清除所有資料嗎？\n這個操作無法復原，將會清空待分箱區、所有箱子和訂單號碼。")) {
+            AppState.pool.clear();
+            AppState.bins.clear();
+            binCounter = 0;
+            orderNumberInput.value = '';
+            dataInput.value = '';
+            searchBox.value = '';
+            currentSearchTerm = '';
+            localStorage.removeItem('binningToolState_v72');
+            render();
+            showToast("所有資料已成功清除。", 'success');
+        }
+    }
 
-    function quickAddBins() {
-        const numStr = prompt("請輸入要一次新增的箱子數量：", "5");
-        if (numStr === null) return;
-        const num = parseInt(numStr);
-        if (isNaN(num) || num <= 0 || num > 100) {
-            showToast("請輸入一個 1 到 100 之間的有效數字。", "error");
-            return;
-        }
-        for (let i = 0; i < num; i++) {
-            binCounter++;
-            const binId = `bin-${binCounter}`;
-            AppState.bins.set(binId, { name: `第 ${binCounter} 箱`, tracking: '', items: new Map() });
-        }
-        render();
-        saveStateToLocalStorage();
-        showToast(`已成功新增 ${num} 個箱子。`, 'success');
-    }
+    function quickAddBins() {
+        const numStr = prompt("請輸入要一次新增的箱子數量：", "5");
+        if (numStr === null) return;
+        const num = parseInt(numStr);
+        if (isNaN(num) || num <= 0 || num > 100) {
+            showToast("請輸入一個 1 到 100 之間的有效數字。", "error");
+            return;
+        }
+        for (let i = 0; i < num; i++) {
+            binCounter++;
+            const binId = `bin-${binCounter}`;
+            AppState.bins.set(binId, { name: `第 ${binCounter} 箱`, tracking: '', items: new Map() });
+        }
+        render();
+        saveStateToLocalStorage();
+        showToast(`已成功新增 ${num} 個箱子。`, 'success');
+    }
 
-    // --- 事件監聽器綁定 ---
-    parseBtn.addEventListener('click', () => {
-        const parsedMap = intelligentParse(dataInput.value.trim().split('\n'));
-        if (parsedMap.size > 0) {
-            AppState.pool = parsedMap;
-            AppState.bins.clear();
-            binCounter = 0;
-            render();
-            dataInput.value = '';
-            showToast('資料解析成功！', 'success');
-            saveStateToLocalStorage();
-        } else {
-            showToast("解析失敗！請檢查資料格式。", 'error');
-        }
-    });
-    addBinBtn.addEventListener('click', () => {
-        binCounter++;
-        const binId = `bin-${binCounter}`;
-        AppState.bins.set(binId, { name: `第 ${binCounter} 箱`, tracking: '', items: new Map() });
-        render();
-        saveStateToLocalStorage();
-    });
-    clearDataBtn.addEventListener('click', clearAllData);
-    quickAddBinsBtn.addEventListener('click', quickAddBins);
-    searchBox.addEventListener('input', () => {
-        currentSearchTerm = searchBox.value.trim().toLowerCase();
-        render();
-    });
-    binArea.addEventListener('click', (e) => {
-        if (e.target.classList.contains('delete-bin-btn')) {
-            const binEl = e.target.closest('.bin');
-            if (!binEl) return;
-            const binId = binEl.dataset.binId;
-            const binData = AppState.bins.get(binId);
-            if (confirm(`確定要刪除「${binData.name}」嗎？\n(箱內所有商品將會被移回待分箱區)`)) {
-                if (binData.items.size > 0) {
-                    returnItemsToPool(Array.from(binData.items.values()));
-                }
-                AppState.bins.delete(binId);
-                reIndexBins();
-                render();
-                saveStateToLocalStorage();
-            }
-        }
-    });
-    document.addEventListener('dragstart', e => {
-        const itemEl = e.target.closest('.item');
-        if (itemEl) {
-            const itemInfo = { code: itemEl.dataset.code, source: itemEl.dataset.source };
-            e.dataTransfer.setData('application/json', JSON.stringify(itemInfo));
-            e.dataTransfer.effectAllowed = 'move';
-            setTimeout(() => itemEl.classList.add('dragging'), 0);
-        }
-    });
-    document.addEventListener('dragend', e => { const el = e.target.closest('.item'); if(el) el.classList.remove('dragging'); });
-    document.addEventListener('dragover', e => {
-        e.preventDefault();
-        const targetBin = e.target.closest('.bin');
-        const targetPool = e.target.closest('#item-list-content');
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        itemListContent.style.borderColor = 'transparent';
-        if (targetBin) { targetBin.classList.add('drag-over'); }
-        if (targetPool) { itemListContent.style.borderColor = '#007bff'; }
-    });
-    document.addEventListener('dragleave', e => {
-        const targetBin = e.target.closest('.bin');
-        const targetPool = e.target.closest('#item-list-content');
-        if(targetBin) targetBin.classList.remove('drag-over');
-        if(targetPool) itemListContent.style.borderColor = 'transparent';
-    });
-    document.addEventListener('drop', e => {
-        e.preventDefault();
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        itemListContent.style.borderColor = 'transparent';
-        const targetBinEl = e.target.closest('.bin');
-        const targetPoolEl = e.target.closest('#item-list-content');
-        try {
-            const itemInfo = JSON.parse(e.dataTransfer.getData('application/json'));
-            if (!itemInfo) return;
-            if (targetBinEl && itemInfo.source === 'pool') {
-                const targetBinId = targetBinEl.dataset.binId;
-                const itemData = AppState.pool.get(itemInfo.code);
-                if (!itemData) return;
-                if (itemData.quantity > 1) {
-                    showQuantityModal(itemData, itemInfo.source, targetBinId);
-                } else {
-                    moveItem(itemInfo.code, itemInfo.source, targetBinId, 1);
-                }
-            } 
-            else if (targetPoolEl && itemInfo.source !== 'pool') {
-                const sourceBinId = itemInfo.source;
-                const itemCode = itemInfo.code;
-                const sourceBinMap = AppState.bins.get(sourceBinId)?.items;
-                if (!sourceBinMap || !sourceBinMap.has(itemCode)) return;
-                const itemData = sourceBinMap.get(itemCode);
-                moveItem(itemData.code, sourceBinId, 'pool', itemData.quantity);
-            }
-        } catch (err) { console.error("拖曳資料解析失敗:", err); }
-    });
-    
-    function handleModalConfirm() {
-        const amount = parseInt(modalQuantityInput.value);
-        const maxAmount = parseInt(modalQuantityInput.max);
-        if (amount > 0 && amount <= maxAmount && modalCallback) {
-            modalCallback(amount);
-            hideQuantityModal();
-        } else {
-            showToast(`請輸入 1 到 ${maxAmount} 之間的有效數量！`, 'error');
-        }
-    }
-    modalConfirmBtn.addEventListener('click', handleModalConfirm);
-    modalQuantityInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleModalConfirm();
-        }
-    });
-    modalCancelBtn.addEventListener('click', hideQuantityModal);
-    choiceCancelBtn.addEventListener('click', hideChoiceModal);
+    // --- 事件監聽器綁定 ---
+    parseBtn.addEventListener('click', () => {
+        const parsedMap = intelligentParse(dataInput.value.trim().split('\n'));
+        if (parsedMap.size > 0) {
+            AppState.pool = parsedMap;
+            AppState.bins.clear();
+            binCounter = 0;
+            render();
+            dataInput.value = '';
+            showToast('資料解析成功！', 'success');
+            saveStateToLocalStorage();
+        } else {
+            showToast("解析失敗！請檢查資料格式。", 'error');
+        }
+    });
+    addBinBtn.addEventListener('click', () => {
+        binCounter++;
+        const binId = `bin-${binCounter}`;
+        AppState.bins.set(binId, { name: `第 ${binCounter} 箱`, tracking: '', items: new Map() });
+        render();
+        saveStateToLocalStorage();
+    });
+    clearDataBtn.addEventListener('click', clearAllData);
+    quickAddBinsBtn.addEventListener('click', quickAddBins);
+    searchBox.addEventListener('input', () => {
+        currentSearchTerm = searchBox.value.trim().toLowerCase();
+        render();
+    });
+    binArea.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-bin-btn')) {
+            const binEl = e.target.closest('.bin');
+            if (!binEl) return;
+            const binId = binEl.dataset.binId;
+            const binData = AppState.bins.get(binId);
+            if (confirm(`確定要刪除「${binData.name}」嗎？\n(箱內所有商品將會被移回待分箱區)`)) {
+                if (binData.items.size > 0) {
+                    returnItemsToPool(Array.from(binData.items.values()));
+                }
+                AppState.bins.delete(binId);
+                reIndexBins();
+                render();
+                saveStateToLocalStorage();
+            }
+        }
+    });
+    document.addEventListener('dragstart', e => {
+        const itemEl = e.target.closest('.item');
+        if (itemEl) {
+            const itemInfo = { code: itemEl.dataset.code, source: itemEl.dataset.source };
+            e.dataTransfer.setData('application/json', JSON.stringify(itemInfo));
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => itemEl.classList.add('dragging'), 0);
+        }
+    });
+    document.addEventListener('dragend', e => { const el = e.target.closest('.item'); if(el) el.classList.remove('dragging'); });
+    document.addEventListener('dragover', e => {
+        e.preventDefault();
+        const targetBin = e.target.closest('.bin');
+        const targetPool = e.target.closest('#item-list-content');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        itemListContent.style.borderColor = 'transparent';
+        if (targetBin) { targetBin.classList.add('drag-over'); }
+        if (targetPool) { itemListContent.style.borderColor = '#007bff'; }
+    });
+    document.addEventListener('dragleave', e => {
+        const targetBin = e.target.closest('.bin');
+        const targetPool = e.target.closest('#item-list-content');
+        if(targetBin) targetBin.classList.remove('drag-over');
+        if(targetPool) itemListContent.style.borderColor = 'transparent';
+    });
+    document.addEventListener('drop', e => {
+        e.preventDefault();
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        itemListContent.style.borderColor = 'transparent';
+        const targetBinEl = e.target.closest('.bin');
+        const targetPoolEl = e.target.closest('#item-list-content');
+        try {
+            const itemInfo = JSON.parse(e.dataTransfer.getData('application/json'));
+            if (!itemInfo) return;
+            if (targetBinEl && itemInfo.source === 'pool') {
+                const targetBinId = targetBinEl.dataset.binId;
+                const itemData = AppState.pool.get(itemInfo.code);
+                if (!itemData) return;
+                if (itemData.quantity > 1) {
+                    showQuantityModal(itemData, itemInfo.source, targetBinId);
+                } else {
+                    moveItem(itemInfo.code, itemInfo.source, targetBinId, 1);
+                }
+            } 
+            else if (targetPoolEl && itemInfo.source !== 'pool') {
+                const sourceBinId = itemInfo.source;
+                const itemCode = itemInfo.code;
+                const sourceBinMap = AppState.bins.get(sourceBinId)?.items;
+                if (!sourceBinMap || !sourceBinMap.has(itemCode)) return;
+                const itemData = sourceBinMap.get(itemCode);
+                moveItem(itemData.code, sourceBinId, 'pool', itemData.quantity);
+            }
+        } catch (err) { console.error("拖曳資料解析失敗:", err); }
+    });
+    
+    function handleModalConfirm() {
+        const amount = parseInt(modalQuantityInput.value);
+        const maxAmount = parseInt(modalQuantityInput.max);
+        if (amount > 0 && amount <= maxAmount && modalCallback) {
+            modalCallback(amount);
+            hideQuantityModal();
+        } else {
+            showToast(`請輸入 1 到 ${maxAmount} 之間的有效數量！`, 'error');
+        }
+    }
+    modalConfirmBtn.addEventListener('click', handleModalConfirm);
+    modalQuantityInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleModalConfirm();
+        }
+    });
+    modalCancelBtn.addEventListener('click', hideQuantityModal);
+    choiceCancelBtn.addEventListener('click', hideChoiceModal);
 
-    // --- 快速指令 ---
-    function processCommand(commandText) {
-        const tokens = commandText.trim().split(/\s+/).filter(Boolean);
-        if (tokens.length < 3) {
-            showToast("指令格式錯誤！請檢查格式。", 'error');
-            return false;
-        }
+    // --- 快速指令 ---
+    function processCommand(commandText) {
+        const tokens = commandText.trim().split(/\s+/).filter(Boolean);
+        if (tokens.length < 3) {
+            showToast("指令格式錯誤！請檢查格式。", 'error');
+            return false;
+        }
 
-        let sourceId, targetId, searchTerm, quantityToMove;
-        const isNumeric = (str) => str !== null && str.trim() !== '' && !isNaN(str) && !isNaN(parseFloat(str));
+        let sourceId, targetId, searchTerm, quantityToMove;
+        const isNumeric = (str) => str !== null && str.trim() !== '' && !isNaN(str) && !isNaN(parseFloat(str));
 
-        const L1 = tokens[tokens.length - 1];
-        const L2 = tokens[tokens.length - 2];
-        const L3 = tokens.length >= 3 ? tokens[tokens.length - 3] : null;
+        const L1 = tokens[tokens.length - 1];
+        const L2 = tokens[tokens.length - 2];
+        const L3 = tokens.length >= 3 ? tokens[tokens.length - 3] : null;
 
-        if (tokens.length >= 4 && isNumeric(L1) && isNumeric(L2) && isNumeric(L3)) {
-            const fromBinNum = L2;
-            const toBinNum = L1;
-            
-            sourceId = `bin-${fromBinNum}`;
-            
-            if (toBinNum === '0') {
-                targetId = 'pool';
-            } else {
-                targetId = `bin-${toBinNum}`;
-                if (!AppState.bins.has(targetId)) {
-                    showToast(`指令錯誤：找不到目標箱號 ${toBinNum}！`, 'error');
-                    return false;
-                }
-            }
-            
-            quantityToMove = parseInt(L3);
-            searchTerm = tokens.slice(0, tokens.length - 3).join(' ');
-        } 
-        else if (isNumeric(L1) && isNumeric(L2)) {
-            const toBinNum = L1;
-            sourceId = 'pool';
-            targetId = `bin-${toBinNum}`;
-             if (!AppState.bins.has(targetId)) {
-                showToast(`指令錯誤：找不到目標箱號 ${toBinNum}！`, 'error');
-                return false;
-            }
-            quantityToMove = parseInt(L2);
-            searchTerm = tokens.slice(0, tokens.length - 2).join(' ');
-        }
-        else {
-            showToast("指令格式無法識別！\n請使用: (詞 數 去向箱) 或 (詞 數 來源箱 去向箱/0)", "error");
-            return false;
-        }
-        
-        const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId)?.items;
+        if (tokens.length >= 4 && isNumeric(L1) && isNumeric(L2) && isNumeric(L3)) {
+            const fromBinNum = L2;
+            const toBinNum = L1;
+            
+            sourceId = `bin-${fromBinNum}`;
+            
+            if (toBinNum === '0') {
+                targetId = 'pool';
+            } else {
+                targetId = `bin-${toBinNum}`;
+                if (!AppState.bins.has(targetId)) {
+                    showToast(`指令錯誤：找不到目標箱號 ${toBinNum}！`, 'error');
+                    return false;
+                }
+            }
+            
+            quantityToMove = parseInt(L3);
+            searchTerm = tokens.slice(0, tokens.length - 3).join(' ');
+        } 
+        else if (isNumeric(L1) && isNumeric(L2)) {
+            const toBinNum = L1;
+            sourceId = 'pool';
+            targetId = `bin-${toBinNum}`;
+             if (!AppState.bins.has(targetId)) {
+                showToast(`指令錯誤：找不到目標箱號 ${toBinNum}！`, 'error');
+                return false;
+            }
+            quantityToMove = parseInt(L2);
+            searchTerm = tokens.slice(0, tokens.length - 2).join(' ');
+        }
+        else {
+            showToast("指令格式無法識別！\n請使用: (詞 數 去向箱) 或 (詞 數 來源箱 去向箱/0)", "error");
+            return false;
+        }
+        
+        const sourceMap = (sourceId === 'pool') ? AppState.pool : AppState.bins.get(sourceId)?.items;
 
-        if (!sourceMap) { showToast(`指令錯誤：找不到來源「${sourceId}」！`, 'error'); return false; }
-        if (isNaN(quantityToMove) || quantityToMove <= 0) { showToast("指令錯誤：數量必須是正整數。", 'error'); return false; }
-        if (searchTerm.trim() === '') { showToast("指令錯誤：搜尋關鍵字不能為空。", 'error'); return false; }
+        if (!sourceMap) { showToast(`指令錯誤：找不到來源「${sourceId}」！`, 'error'); return false; }
+        if (isNaN(quantityToMove) || quantityToMove <= 0) { showToast("指令錯誤：數量必須是正整數。", 'error'); return false; }
+        if (searchTerm.trim() === '') { showToast("指令錯誤：搜尋關鍵字不能為空。", 'error'); return false; }
 
-        const searchLower = searchTerm.toLowerCase();
-        const results = Array.from(sourceMap.values()).filter(item => 
-            item.name.toLowerCase().includes(searchLower) || 
-            item.code.toLowerCase().includes(searchLower) ||
-            (item.barcode && item.barcode.toLowerCase().includes(searchLower))
-        );
-        
-        if (results.length === 0) {
-            showToast(`在來源 (${sourceId}) 找不到符合 "${searchTerm}" 的商品`, 'error');
-            return false;
-        }
-        
-        if (results.length === 1) {
-            const targetItem = results[0];
-            if (quantityToMove > targetItem.quantity) {
-                showToast(`移動數量 (${quantityToMove}) 超過現有數量 (${targetItem.quantity})`, 'error');
-                return false;
-            }
-            moveItem(targetItem.code, sourceId, targetId, quantityToMove);
-            showToast(`已將 ${quantityToMove} 個 "${targetItem.name}" 執行移動。`, 'success');
-            return true;
-        }
-        
-        if (results.length > 1) {
-            showToast(`發現 ${results.length} 個符合項目，請選擇...`);
-            showChoiceModal(results, quantityToMove, sourceId, targetId);
-            return true;
-        }
+        const searchLower = searchTerm.toLowerCase();
+        const results = Array.from(sourceMap.values()).filter(item => 
+            item.name.toLowerCase().includes(searchLower) || 
+            item.code.toLowerCase().includes(searchLower) ||
+            (item.barcode && item.barcode.toLowerCase().includes(searchLower))
+        );
+        
+        if (results.length === 0) {
+            showToast(`在來源 (${sourceId}) 找不到符合 "${searchTerm}" 的商品`, 'error');
+            return false;
+        }
+        
+        if (results.length === 1) {
+            const targetItem = results[0];
+            if (quantityToMove > targetItem.quantity) {
+                showToast(`移動數量 (${quantityToMove}) 超過現有數量 (${targetItem.quantity})`, 'error');
+                return false;
+            }
+            moveItem(targetItem.code, sourceId, targetId, quantityToMove);
+            showToast(`已將 ${quantityToMove} 個 "${targetItem.name}" 執行移動。`, 'success');
+            return true;
+        }
+        
+        if (results.length > 1) {
+            showToast(`發現 ${results.length} 個符合項目，請選擇...`);
+            showChoiceModal(results, quantityToMove, sourceId, targetId);
+            return true;
+        }
 
-        return false;
-    }
+        return false;
+    }
 
-    executeCommandBtn.addEventListener('click', () => { if (processCommand(commandInput.value)) { commandInput.value = ''; } });
-    commandInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeCommandBtn.click(); } });
-    
-    // --- 匯出功能 ---
-    function setupExports() {
-        const exportBtn = document.getElementById('export-btn');
-        const exportA4PdfBtn = document.getElementById('export-a4-pdf-btn');
-        const exportA5PdfBtn = document.getElementById('export-a5-pdf-btn');
-        const exportThermalPdfBtn = document.getElementById('export-thermal-pdf-btn');
+    executeCommandBtn.addEventListener('click', () => { if (processCommand(commandInput.value)) { commandInput.value = ''; } });
+    commandInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeCommandBtn.click(); } });
+    
+    // --- 匯出功能 ---
+    function setupExports() {
+        const exportBtn = document.getElementById('export-btn');
+        const exportA4PdfBtn = document.getElementById('export-a4-pdf-btn');
+        const exportA5PdfBtn = document.getElementById('export-a5-pdf-btn');
+        const exportThermalPdfBtn = document.getElementById('export-thermal-pdf-btn');
 
-        function generateExportFilename(extension) {
-            const now = new Date();
-            const hh = String(now.getHours()).padStart(2, '0');
-            const mm = String(now.getMinutes()).padStart(2, '0');
-            const ss = String(now.getSeconds()).padStart(2, '0');
-            const orderNumber = orderNumberInput.value.trim() || 'NoOrder';
-            return `${orderNumber}_${hh}${mm}${ss}_packing_list${extension}`;
-        }
+        function generateExportFilename(extension) {
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            const orderNumber = orderNumberInput.value.trim() || 'NoOrder';
+            return `${orderNumber}_${hh}${mm}${ss}_packing_list${extension}`;
+        }
 
-        function exportCSV() {
-            if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
-            const orderNumber = orderNumberInput.value.trim() || 'N/A';
-            let csvContent = "\uFEFF";
-            csvContent += "訂單號碼,箱號,運單號,商品編號,國際條碼,品項名稱,數量\n";
+        function exportCSV() {
+            if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
+            const orderNumber = orderNumberInput.value.trim() || 'N/A';
+            let csvContent = "\uFEFF";
+            csvContent += "訂單號碼,箱號,運單號,商品編號,國際條碼,品項名稱,數量\n";
 
-            const formatCsvField = (value) => {
-                if (value === null || value === undefined) {
-                    return '';
-                }
-                let stringValue = String(value);
-                stringValue = stringValue.replace(/"/g, '""');
-                if (stringValue.search(/("|,|\n)/g) >= 0) {
-                    stringValue = `"${stringValue}"`;
-                }
-                return stringValue;
-            };
+            const formatCsvField = (value) => {
+                if (value === null || value === undefined) {
+                    return '';
+                }
+                let stringValue = String(value);
+                stringValue = stringValue.replace(/"/g, '""');
+                if (stringValue.search(/("|,|\n)/g) >= 0) {
+                    stringValue = `"${stringValue}"`;
+                }
+                return stringValue;
+            };
 
-            AppState.bins.forEach(binData => {
-                if (binData.items.size === 0) {
-                    const row = [orderNumber, binData.name, binData.tracking, '', '', '此箱無商品', 0].map(formatCsvField).join(',');
-                    csvContent += row + "\n";
-                } else {
-                    binData.items.forEach(item => {
-                        const row = [
-                            orderNumber, binData.name, binData.tracking,
-                            item.code, item.barcode, item.name, item.quantity
-                        ].map(formatCsvField).join(',');
-                        csvContent += row + "\n";
-                    });
-                }
-            });
+            AppState.bins.forEach(binData => {
+                if (binData.items.size === 0) {
+                    const row = [orderNumber, binData.name, binData.tracking, '', '', '此箱無商品', 0].map(formatCsvField).join(',');
+                    csvContent += row + "\n";
+                } else {
+                    binData.items.forEach(item => {
+                        const row = [
+                            orderNumber, binData.name, binData.tracking,
+                            item.code, item.barcode, item.name, item.quantity
+                        ].map(formatCsvField).join(',');
+                        csvContent += row + "\n";
+                    });
+                }
+            });
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = generateExportFilename('.csv');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = generateExportFilename('.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
 
-        function exportA4PDF() {
-            if (AppState.bins.size === 0 && AppState.pool.size === 0) { showToast("沒有任何資料可以匯出！", "error"); return; }
-            const btn = document.getElementById('export-a4-pdf-btn');
-            btn.disabled = true; btn.textContent = '準備預覽...';
-            const poolTotal = Array.from(AppState.pool.values()).reduce((sum, item) => sum + item.quantity, 0);
-            let binsTotal = 0;
-            AppState.bins.forEach(binData => { binsTotal += Array.from(binData.items.values()).reduce((sum, item) => sum + item.quantity, 0); });
-            const orderTotal = poolTotal + binsTotal;
-            const orderNumber = orderNumberInput.value.trim() || 'N/A';
-            const exportDate = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
-            
-            const printStyles = `<style>@media print { body { margin: 0; -webkit-print-color-adjust: exact; } } body{font-family:'Helvetica','Arial','Microsoft JhengHei',sans-serif;font-size:10px;}.pdf-container{margin:20px;}.pdf-header h1{font-size:24px;}.pdf-header p{font-size:12px;}table{width:100%;border-collapse:collapse;margin-top:10px;}th,td{border:1px solid #ddd;padding:6px;text-align:left;word-break:break-all;}th{background-color:#f8f8f8;}.pdf-bin{page-break-inside:avoid; margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 8px;}</style>`;
-            
-            let contentHTML = `<div class="pdf-container"><div class="pdf-header"><h1>分箱明細總表</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p><p><strong>匯出日期:</strong> ${exportDate}</p><p><strong>訂單總數:</strong> ${orderTotal}</p></div>`;
-            const totalBins = AppState.bins.size;
-            Array.from(AppState.bins.values()).forEach((binData, binIndex) => {
-                const newTitle = `第 ${totalBins}-${binIndex + 1} 箱`;
-                contentHTML += `<div class="pdf-bin"><h2>${newTitle}</h2><p><strong>運單號:</strong> ${binData.tracking || '未填寫'}</p><table><thead><tr><th>品項名稱</th><th>商品編號</th><th>國際條碼</th><th>數量</th></tr></thead><tbody>`;
-                if (binData.items.size > 0) {
-                    binData.items.forEach(item => { contentHTML += `<tr><td>${item.name}</td><td>${item.code}</td><td>${item.barcode}</td><td>${item.quantity}</td></tr>`; });
-                } else {
-                    contentHTML += `<tr><td colspan="4" style="text-align:center;">此箱無商品</td></tr>`;
-                }
-                contentHTML += `</tbody></table></div>`;
-            });
-            contentHTML += '</div>';
+        function exportA4PDF() {
+            if (AppState.bins.size === 0 && AppState.pool.size === 0) { showToast("沒有任何資料可以匯出！", "error"); return; }
+            const btn = document.getElementById('export-a4-pdf-btn');
+            btn.disabled = true; btn.textContent = '準備預覽...';
+            const poolTotal = Array.from(AppState.pool.values()).reduce((sum, item) => sum + item.quantity, 0);
+            let binsTotal = 0;
+            AppState.bins.forEach(binData => { binsTotal += Array.from(binData.items.values()).reduce((sum, item) => sum + item.quantity, 0); });
+            const orderTotal = poolTotal + binsTotal;
+            const orderNumber = orderNumberInput.value.trim() || 'N/A';
+            const exportDate = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            
+            const printStyles = `<style>@media print { body { margin: 0; -webkit-print-color-adjust: exact; } } body{font-family:'Helvetica','Arial','Microsoft JhengHei',sans-serif;font-size:10px;}.pdf-container{margin:20px;}.pdf-header h1{font-size:24px;}.pdf-header p{font-size:12px;}table{width:100%;border-collapse:collapse;margin-top:10px;}th,td{border:1px solid #ddd;padding:6px;text-align:left;word-break:break-all;}th{background-color:#f8f8f8;}.pdf-bin{page-break-inside:avoid; margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 8px;}</style>`;
+            
+            let contentHTML = `<div class="pdf-container"><div class="pdf-header"><h1>分箱明細總表</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p><p><strong>匯出日期:</strong> ${exportDate}</p><p><strong>訂單總數:</strong> ${orderTotal}</p></div>`;
+            const totalBins = AppState.bins.size;
+            Array.from(AppState.bins.values()).forEach((binData, binIndex) => {
+                const newTitle = `第 ${totalBins}-${binIndex + 1} 箱`;
+                contentHTML += `<div class="pdf-bin"><h2>${newTitle}</h2><p><strong>運單號:</strong> ${binData.tracking || '未填寫'}</p><table><thead><tr><th>品項名稱</th><th>商品編號</th><th>國際條碼</th><th>數量</th></tr></thead><tbody>`;
+                if (binData.items.size > 0) {
+                    binData.items.forEach(item => { contentHTML += `<tr><td>${item.name}</td><td>${item.code}</td><td>${item.barcode}</td><td>${item.quantity}</td></tr>`; });
+                } else {
+                    contentHTML += `<tr><td colspan="4" style="text-align:center;">此箱無商品</td></tr>`;
+                }
+                contentHTML += `</tbody></table></div>`;
+            });
+            contentHTML += '</div>';
 
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
-                btn.disabled = false; btn.textContent = '匯出 PDF (A4總表)';
-                return;
-            }
-            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>A4分箱總表 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
-            printWindow.document.close();
-            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
-            btn.disabled = false; btn.textContent = '匯出 PDF (A4總表)';
-        }
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
+                btn.disabled = false; btn.textContent = '匯出 PDF (A4總表)';
+                return;
+            }
+            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>A4分箱總表 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
+            btn.disabled = false; btn.textContent = '匯出 PDF (A4總表)';
+        }
 
-        function exportA5BoxLabelsPDF() {
-            if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
-            const btn = document.getElementById('export-a5-pdf-btn');
-            btn.disabled = true; btn.textContent = '準備預覽...';
-            const orderNumber = orderNumberInput.value.trim() || 'N/A';
-            const printStyles = `<style>@media print{body{margin:0;-webkit-print-color-adjust:exact}}*{box-sizing:border-box}body{font-family:'Helvetica','Arial','Microsoft JhengHei',sans-serif}.a5-label-page{width:210mm;height:132.5mm;padding:7mm;page-break-after:always;border:1px dashed #ccc;margin:10mm auto}.a5-label-page:last-child{page-break-after:auto}.header,.footer{text-align:center}.header h1{margin:0 0 5px 0;font-size:26px}.header p{margin:0;font-size:16px}.content{margin-top:5px}.content table{width:100%;border-collapse:collapse}.content th,.content td{border:1px solid #ccc;padding:3px;text-align:left;font-size:12px;line-height:1.2}.content th{background-color:#f2f2f2}.footer{margin-top:15px;padding-top:8px}.footer p{font-size:14px;margin:3px 0}.footer-table{display:inline-table;text-align:left;font-size:16px;margin-top:5px}.footer-table td{padding:3px 5px}</style>`;
-            
-            let contentHTML = ``;
-            const binsArray = Array.from(AppState.bins.values());
-            const totalBins = binsArray.length;
-            binsArray.forEach((binData, binIndex) => {
-                const itemsArray = Array.from(binData.items.values());
-                const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
-                const chunkSize = 10;
-                const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
-                for (let i = 0; i < totalPagesForBin; i++) {
-                    const itemChunk = itemsArray.slice(i * chunkSize, (i + 1) * chunkSize);
-                    const newTitle = `第 ${totalBins}-${binIndex + 1} 箱 <span style="font-size: 60%;">(${i + 1}/${totalPagesForBin})</span>`;
-                    const footerHTML = `<div class="footer"><p><strong>本箱總數: ${binTotal} 件</strong></p><table class="footer-table"><tbody><tr><td><strong>運單號:</strong></td><td>${binData.tracking || '___________________'}</td></tr><tr><td><strong>簽收:</strong></td><td>___________________</td></tr></tbody></table></div>`;
-                    contentHTML += `<div class="a5-label-page"><div class="header"><h1>${newTitle}</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p></div><div class="content"><table><thead><tr><th style="width:80%">品項名稱</th><th>數量</th></tr></thead><tbody>`;
-                    if (itemChunk.length > 0) {
-                        itemChunk.forEach(item => { contentHTML += `<tr><td>${item.name}</td><td style="text-align:center">${item.quantity}</td></tr>`; });
-                    } else {
-                        contentHTML += `<tr><td colspan="2" style="text-align:center;height:50mm">此箱無商品</td></tr>`;
-                    }
-                    contentHTML += `</tbody></table></div>${footerHTML}</div>`;
-                }
-            });
+        function exportA5BoxLabelsPDF() {
+            if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
+            const btn = document.getElementById('export-a5-pdf-btn');
+            btn.disabled = true; btn.textContent = '準備預覽...';
+            const orderNumber = orderNumberInput.value.trim() || 'N/A';
+            const printStyles = `<style>@media print{body{margin:0;-webkit-print-color-adjust:exact}}*{box-sizing:border-box}body{font-family:'Helvetica','Arial','Microsoft JhengHei',sans-serif}.a5-label-page{width:210mm;height:132.5mm;padding:7mm;page-break-after:always;border:1px dashed #ccc;margin:10mm auto}.a5-label-page:last-child{page-break-after:auto}.header,.footer{text-align:center}.header h1{margin:0 0 5px 0;font-size:26px}.header p{margin:0;font-size:16px}.content{margin-top:5px}.content table{width:100%;border-collapse:collapse}.content th,.content td{border:1px solid #ccc;padding:3px;text-align:left;font-size:12px;line-height:1.2}.content th{background-color:#f2f2f2}.footer{margin-top:15px;padding-top:8px}.footer p{font-size:14px;margin:3px 0}.footer-table{display:inline-table;text-align:left;font-size:16px;margin-top:5px}.footer-table td{padding:3px 5px}</style>`;
+            
+            let contentHTML = ``;
+            const binsArray = Array.from(AppState.bins.values());
+            const totalBins = binsArray.length;
+            binsArray.forEach((binData, binIndex) => {
+                const itemsArray = Array.from(binData.items.values());
+                const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
+                const chunkSize = 10;
+                const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
+                for (let i = 0; i < totalPagesForBin; i++) {
+                    const itemChunk = itemsArray.slice(i * chunkSize, (i + 1) * chunkSize);
+                    const newTitle = `第 ${totalBins}-${binIndex + 1} 箱 <span style="font-size: 60%;">(${i + 1}/${totalPagesForBin})</span>`;
+                    const footerHTML = `<div class="footer"><p><strong>本箱總數: ${binTotal} 件</strong></p><table class="footer-table"><tbody><tr><td><strong>運單號:</strong></td><td>${binData.tracking || '___________________'}</td></tr><tr><td><strong>簽收:</strong></td><td>___________________</td></tr></tbody></table></div>`;
+                    contentHTML += `<div class="a5-label-page"><div class="header"><h1>${newTitle}</h1><p><strong>訂單號碼:</strong> ${orderNumber}</p></div><div class="content"><table><thead><tr><th style="width:80%">品項名稱</th><th>數量</th></tr></thead><tbody>`;
+                    if (itemChunk.length > 0) {
+                        itemChunk.forEach(item => { contentHTML += `<tr><td>${item.name}</td><td style="text-align:center">${item.quantity}</td></tr>`; });
+                    } else {
+                        contentHTML += `<tr><td colspan="2" style="text-align:center;height:50mm">此箱無商品</td></tr>`;
+                    }
+                    contentHTML += `</tbody></table></div>${footerHTML}</div>`;
+                }
+            });
 
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
-                btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
-                return;
-            }
-            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>列印箱貼 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
-            printWindow.document.close();
-            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
-            btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
-        }
-        
-        // ===================================================================================
-        // === 智慧計算熱感紙匯出函式 (開始) ===
-        // ===================================================================================
-        function exportThermalLabelsPDF() {
-            if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
-            const btn = document.getElementById('export-thermal-pdf-btn');
-            btn.disabled = true; btn.textContent = '準備預覽...';
-            const orderNumber = orderNumberInput.value.trim() || 'N/A';
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
+                btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
+                return;
+            }
+            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>列印箱貼 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
+            btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
+        }
+        
+        function exportThermalLabelsPDF() {
+            if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
+            const btn = document.getElementById('export-thermal-pdf-btn');
+            btn.disabled = true; btn.textContent = '準備預覽...';
+            const orderNumber = orderNumberInput.value.trim() || 'N/A';
 
             // --- 智慧計算核心邏輯 ---
-            // 這些是基於 CSS 樣式的估算值，單位為 mm。如果調整了 CSS，需要同步修改這裡。
+            // 這些是基於 CSS 樣式的估算值，單位為 mm。如果調整了 CSS，可能需要同步修改這裡。
             const LABEL_TOTAL_HEIGHT_MM = 140; // 標籤內容可用總高度 (150mm 紙張高度 - 5mm*2 邊距)
             const HEADER_ESTIMATED_HEIGHT_MM = 20; // 頁首的估計高度
             const FOOTER_ESTIMATED_HEIGHT_MM = 15; // 頁尾的估計高度
-            const ITEM_ROW_HEIGHT_MM = 7; // 單一品項列的估計高度 (包含內距)
+            const ITEM_ROW_HEIGHT_MM = 7; // 單一品項列的固定高度 (包含內距)
 
             // 計算可容納品項的實際空間
             const availableContentHeight = LABEL_TOTAL_HEIGHT_MM - HEADER_ESTIMATED_HEIGHT_MM - FOOTER_ESTIMATED_HEIGHT_MM;
@@ -741,154 +738,147 @@
             const chunkSize = Math.floor(availableContentHeight / ITEM_ROW_HEIGHT_MM);
             // --- 智慧計算核心邏輯結束 ---
 
-            const printStyles = `<style>
-                @page {
-                    size: 100mm 150mm;
-                    margin: 5mm;
-                }
-                @media print {
-                    body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
-                }
-                * { box-sizing: border-box; }
-                body { font-family: 'Helvetica', 'Arial', 'Microsoft JhengHei', sans-serif; }
-                .thermal-label {
-                    width: 90mm;
-                    height: 140mm;
-                    padding: 3mm;
-                    display: flex;
-                    flex-direction: column;
-                    page-break-after: always;
-                    border: 1px dashed #ccc;
-                    margin: 5mm auto;
-                }
-                .thermal-label:last-child { page-break-after: auto; }
-                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; }
-                .header h1 { margin: 0 0 5px 0; font-size: 24pt; }
-                .header p { margin: 0; font-size: 12pt; }
-                .content { flex-grow: 1; margin-top: 5px; overflow: hidden; }
-                /* 修正1：讓表格佈局固定，以遵守表頭的寬度設定 */
-                .content table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-                .content th, .content td { border: 1px solid #999; padding: 4px; text-align: left; font-size: 10pt; line-height: 1.3; }
-                /* 修正2：針對品項名稱欄位（第一個td），強制不換行並在溢出時顯示省略號，確保行高固定 */
-                .content td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                .content th { background-color: #f2f2f2; }
-                .footer { border-top: 2px solid #000; padding-top: 5px; text-align: center; }
-                .footer p { font-size: 12pt; margin: 3px 0; font-weight: bold; }
-                .footer .tracking-number { font-size: 11pt; margin-top: 5px; }
-            </style>`;
-            
-            let contentHTML = ``;
-            const binsArray = Array.from(AppState.bins.values());
-            const totalBins = binsArray.length;
-            binsArray.forEach((binData, binIndex) => {
-                const itemsArray = Array.from(binData.items.values());
-                const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
-                
-                // 現在 totalPagesForBin 會使用上面智慧計算出的 chunkSize
-                const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
-                
-                for (let i = 0; i < totalPagesForBin; i++) {
-                    const itemChunk = itemsArray.slice(i * chunkSize, (i + 1) * chunkSize);
-                    const newTitle = `第 ${totalBins}-${binIndex + 1} 箱`;
-                    const pageInfo = `(${i + 1}/${totalPagesForBin})`;
+            const printStyles = `<style>
+                @page {
+                    size: 100mm 150mm;
+                    margin: 5mm;
+                }
+                @media print {
+                    body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
+                }
+                * { box-sizing: border-box; }
+                body { font-family: 'Helvetica', 'Arial', 'Microsoft JhengHei', sans-serif; }
+                .thermal-label {
+                    width: 90mm;
+                    height: 140mm;
+                    padding: 3mm;
+                    display: flex;
+                    flex-direction: column;
+                    page-break-after: always;
+                    border: 1px dashed #ccc;
+                    margin: 5mm auto;
+                }
+                .thermal-label:last-child { page-break-after: auto; }
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; }
+                .header h1 { margin: 0 0 5px 0; font-size: 24pt; }
+                .header p { margin: 0; font-size: 12pt; }
+                .content { flex-grow: 1; margin-top: 5px; overflow: hidden; }
+                .content table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+                .content th, .content td { border: 1px solid #999; padding: 4px; text-align: left; font-size: 10pt; line-height: 1.3; }
+                .content td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .content th { background-color: #f2f2f2; }
+                .footer { border-top: 2px solid #000; padding-top: 5px; text-align: center; }
+                .footer p { font-size: 12pt; margin: 3px 0; font-weight: bold; }
+                .footer .tracking-number { font-size: 11pt; margin-top: 5px; }
+            </style>`;
+            
+            let contentHTML = ``;
+            const binsArray = Array.from(AppState.bins.values());
+            const totalBins = binsArray.length;
+            binsArray.forEach((binData, binIndex) => {
+                const itemsArray = Array.from(binData.items.values());
+                const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
+                const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
+                
+                for (let i = 0; i < totalPagesForBin; i++) {
+                    const itemChunk = itemsArray.slice(i * chunkSize, (i + 1) * chunkSize);
+                    const newTitle = `第 ${totalBins}-${binIndex + 1} 箱`;
+                    const pageInfo = `(${i + 1}/${totalPagesForBin})`;
 
-                    contentHTML += `<div class="thermal-label">`;
-                    contentHTML += `
-                        <div class="header">
-                            <h1>${newTitle} <span style="font-size: 60%;">${pageInfo}</span></h1>
-                            <p><strong>訂單號碼:</strong> ${orderNumber}</p>
-                        </div>
-                    `;
-                    contentHTML += `<div class="content"><table><thead><tr><th style="width:80%">品項名稱</th><th style="text-align:center;">數量</th></tr></thead><tbody>`;
+                    contentHTML += `<div class="thermal-label">`;
+                    contentHTML += `
+                        <div class="header">
+                            <h1>${newTitle} <span style="font-size: 60%;">${pageInfo}</span></h1>
+                            <p><strong>訂單號碼:</strong> ${orderNumber}</p>
+                        </div>
+                    `;
+                    contentHTML += `<div class="content"><table><thead><tr><th style="width:80%">品項名稱</th><th style="text-align:center;">數量</th></tr></thead><tbody>`;
 
-                    if (itemChunk.length > 0) {
-                        itemChunk.forEach(item => {
-                            contentHTML += `<tr><td>${item.name}</td><td style="text-align:center;">${item.quantity}</td></tr>`;
-                        });
-                    } else {
-                        contentHTML += `<tr><td colspan="2" style="text-align:center;height:100mm;">此箱無商品</td></tr>`;
-                    }
+                    if (itemChunk.length > 0) {
+                        itemChunk.forEach(item => {
+                            contentHTML += `<tr><td>${item.name}</td><td style="text-align:center;">${item.quantity}</td></tr>`;
+                        });
+                    } else {
+                        contentHTML += `<tr><td colspan="2" style="text-align:center;height:100mm;">此箱無商品</td></tr>`;
+                    }
 
-                    contentHTML += `</tbody></table></div>`;
-                    contentHTML += `
-                        <div class="footer">
-                            <p>本箱總計: ${binTotal} 件</p>
-                            <p class="tracking-number">運單號: ${binData.tracking || '______________________'}</p>
-                        </div>
-                    `;
-                    contentHTML += `</div>`;
-                }
-            });
+                    contentHTML += `</tbody></table></div>`;
+                    contentHTML += `
+                        <div class="footer">
+                            <p>本箱總計: ${binTotal} 件</p>
+                            <p class="tracking-number">運單號: ${binData.tracking || '______________________'}</p>
+                        </div>
+                    `;
+                    contentHTML += `</div>`;
+                }
+            });
 
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
-                btn.disabled = false; btn.textContent = '匯出 熱感紙 (10x15)';
-                return;
-            }
-            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>列印熱感應標籤 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
-            printWindow.document.close();
-            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
-            btn.disabled = false; btn.textContent = '匯出 熱感紙 (10x15)';
-        }
-        // ===================================================================================
-        // === 智慧計算熱感紙匯出函式 (結束) ===
-        // ===================================================================================
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                showToast("無法打開預覽視窗，請檢查彈出視窗是否被封鎖。", "error");
+                btn.disabled = false; btn.textContent = '匯出 熱感紙 (10x15)';
+                return;
+            }
+            printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>列印熱感應標籤 - ${orderNumber}</title>${printStyles}</head><body>${contentHTML}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
+            btn.disabled = false; btn.textContent = '匯出 熱感紙 (10x15)';
+        }
 
-        exportBtn.addEventListener('click', exportCSV);
-        exportA4PdfBtn.addEventListener('click', exportA4PDF);
-        exportA5PdfBtn.addEventListener('click', exportA5BoxLabelsPDF);
-        exportThermalPdfBtn.addEventListener('click', exportThermalLabelsPDF);
-    }
-    setupExports();
-    
-    function showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast-notification ${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.classList.add('show'); }, 10);
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
-    
-    function saveStateToLocalStorage() {
-        try {
-            const stateToSave = {
-                pool: Array.from(AppState.pool.entries()),
-                bins: Array.from(AppState.bins.entries()).map(([binId, binData]) => {
-                    return [binId, { ...binData, items: Array.from(binData.items.entries()) }];
-                }),
-                binCounter: binCounter,
-                orderNumber: orderNumberInput.value,
-            };
-            localStorage.setItem('binningToolState_v72', JSON.stringify(stateToSave));
-        } catch (e) { console.error("無法儲存狀態:", e); }
-    }
-    function loadStateFromLocalStorage() {
-        const savedStateJSON = localStorage.getItem('binningToolState_v72');
-        if (!savedStateJSON) return;
-        try {
-            const savedState = JSON.parse(savedStateJSON);
-            AppState.pool = new Map(savedState.pool);
-            AppState.bins = new Map(savedState.bins.map(([binId, binData]) => {
-                return [binId, { ...binData, items: new Map(binData.items) }];
-            }));
-            binCounter = savedState.binCounter || 0;
-            orderNumberInput.value = savedState.orderNumber || '';
-            render();
-            showToast("已成功載入上次的進度。", 'success');
-        } catch(e) {
-            console.error("載入狀態失敗:", e);
-            localStorage.removeItem('binningToolState_v72');
-        }
-    }
-    
-    // --- 初始呼叫 ---
-    orderNumberInput.addEventListener('input', saveStateToLocalStorage);
-    document.addEventListener('DOMContentLoaded', loadStateFromLocalStorage);
+        exportBtn.addEventListener('click', exportCSV);
+        exportA4PdfBtn.addEventListener('click', exportA4PDF);
+        exportA5PdfBtn.addEventListener('click', exportA5BoxLabelsPDF);
+        exportThermalPdfBtn.addEventListener('click', exportThermalLabelsPDF);
+    }
+    setupExports();
+    
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.classList.add('show'); }, 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+    
+    function saveStateToLocalStorage() {
+        try {
+            const stateToSave = {
+                pool: Array.from(AppState.pool.entries()),
+                bins: Array.from(AppState.bins.entries()).map(([binId, binData]) => {
+                    return [binId, { ...binData, items: Array.from(binData.items.entries()) }];
+                }),
+                binCounter: binCounter,
+                orderNumber: orderNumberInput.value,
+            };
+            localStorage.setItem('binningToolState_v72', JSON.stringify(stateToSave));
+        } catch (e) { console.error("無法儲存狀態:", e); }
+    }
+    function loadStateFromLocalStorage() {
+        const savedStateJSON = localStorage.getItem('binningToolState_v72');
+        if (!savedStateJSON) return;
+        try {
+            const savedState = JSON.parse(savedStateJSON);
+            AppState.pool = new Map(savedState.pool);
+            AppState.bins = new Map(savedState.bins.map(([binId, binData]) => {
+                return [binId, { ...binData, items: new Map(binData.items) }];
+            }));
+            binCounter = savedState.binCounter || 0;
+            orderNumberInput.value = savedState.orderNumber || '';
+            render();
+            showToast("已成功載入上次的進度。", 'success');
+        } catch(e) {
+            console.error("載入狀態失敗:", e);
+            localStorage.removeItem('binningToolState_v72');
+        }
+    }
+    
+    // --- 初始呼叫 ---
+    orderNumberInput.addEventListener('input', saveStateToLocalStorage);
+    document.addEventListener('DOMContentLoaded', loadStateFromLocalStorage);
 
 </script>
 </body>
