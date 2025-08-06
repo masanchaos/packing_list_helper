@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V74 - 列印優化版)</title>
+    <title>智慧拖拽分箱工具 (V76 - 每頁 13 項優化版)</title>
     <style>
         /* --- 全局與佈局 --- */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
@@ -718,7 +718,6 @@
             btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
         }
         
-        // === 修改: 優化熱感紙列印樣式 ===
         function exportThermalLabelsPDF() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
             const btn = document.getElementById('export-thermal-pdf-btn');
@@ -737,7 +736,7 @@
                 .thermal-label {
                     width: 90mm;
                     height: 140mm;
-                    padding: 3mm; /* 新增內距作為安全緩衝區 */
+                    padding: 3mm;
                     display: flex;
                     flex-direction: column;
                     page-break-after: always;
@@ -763,7 +762,8 @@
             binsArray.forEach((binData, binIndex) => {
                 const itemsArray = Array.from(binData.items.values());
                 const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
-                const chunkSize = 18;
+                // === 修改：根據您的回饋，將每頁最大品項數調整為 13 ===
+                const chunkSize = 13;
                 const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
                 
                 for (let i = 0; i < totalPagesForBin; i++) {
