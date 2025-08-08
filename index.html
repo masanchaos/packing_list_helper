@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V83 - 錯誤修正最終版)</title>
+    <title>智慧拖拽分箱工具 (V84 - 穩定分頁最終版)</title>
     <style>
         /* --- 全局與佈局 --- */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
@@ -733,11 +733,17 @@
             btn.disabled = false; btn.textContent = '匯出 PDF (A5箱貼)';
         }
         
+        // =======================================================================
+        // ========== 修正後的匯出熱感紙函式 (START) ==========
+        // =======================================================================
         function exportThermalLabelsPDF() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
             const btn = document.getElementById('export-thermal-pdf-btn');
             btn.disabled = true; btn.textContent = '準備預覽...';
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
+
+            // 增加每頁的品項數，因為我們縮小了字體
+            const chunkSize = 11; 
 
             const printStyles = `<style>
                 @page { size: 100mm 150mm; margin: 5mm; }
@@ -749,119 +755,83 @@
                 .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; flex-shrink: 0; }
                 .header h1 { margin: 0 0 5px 0; font-size: 24pt; }
                 .header p { margin: 0; font-size: 12pt; }
-                .content { flex-grow: 1; margin-top: 5px; overflow: hidden; }
+                .content { flex-grow: 1; margin-top: 5px; }
                 .content table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-                .content th, .content td { border: 1px solid #999; padding: 4px; text-align: left; font-size: 10pt; line-height: 1.3; vertical-align: top; word-break: break-all; }
-                .content th { background-color: #f2f2f2; }
-                .footer { border-top: 2px solid #000; padding-top: 5px; text-align: center; flex-shrink: 0; }
-                .footer p { font-size: 12pt; margin: 3px 0; font-weight: bold; }
-                .footer .tracking-number { font-size: 11pt; margin-top: 5px; }
+                /* --- 修正開始：減小表格字型與間距 --- */
+                .content th, .content td {
+                    border: 1px solid #999;
+                    padding: 2px 3px; /* 減少內邊距 */
+                    text-align: left;
+                    font-size: 9pt;   /* 減小字體 */
+                    line-height: 1.2; /* 調整行高 */
+                    vertical-align: top;
+                    word-break: break-all;
+                }
+                /* --- 修正結束 --- */
+                .content th { background-color: #f2f2f2; font-weight: bold; }
+                .footer {
+                    border-top: 2px solid #000;
+                    padding-top: 3px;
+                    text-align: center;
+                    page-break-inside: avoid;
+                    flex-shrink: 0;
+                }
+                .footer p {
+                    font-size: 11pt;
+                    margin: 2px 0;
+                    font-weight: bold;
+                    line-height: 1.2;
+                }
             </style>`;
-
-            const measuringDiv = document.createElement('div');
-            measuringDiv.style.position = 'absolute';
-            measuringDiv.style.visibility = 'hidden';
-            measuringDiv.style.left = '-9999px';
-            measuringDiv.style.top = '-9999px';
-            document.body.appendChild(measuringDiv);
-
-            const dummyLabel = document.createElement('div');
-            dummyLabel.style.width = '90mm';
-            dummyLabel.style.height = '140mm';
-            dummyLabel.style.padding = '3mm';
-            dummyLabel.style.display = 'flex';
-            dummyLabel.style.flexDirection = 'column';
-            const dummyHeader = document.createElement('div');
-            dummyHeader.style.borderBottom = '2px solid #000';
-            dummyHeader.style.paddingBottom = '5px';
-            dummyHeader.style.flexShrink = '0';
-            const dummyFooter = document.createElement('div');
-            dummyFooter.style.borderTop = '2px solid #000';
-            dummyFooter.style.paddingTop = '5px';
-            dummyFooter.style.flexShrink = '0';
-            const dummyContent = document.createElement('div');
-            dummyContent.style.flexGrow = '1';
-            dummyContent.style.marginTop = '5px';
-            dummyContent.style.overflow = 'hidden';
-            dummyLabel.appendChild(dummyHeader);
-            dummyLabel.appendChild(dummyContent);
-            dummyLabel.appendChild(dummyFooter);
-            measuringDiv.appendChild(dummyLabel);
-            const maxContentHeight = dummyContent.clientHeight;
-            
-            const contentMeasureEl = document.createElement('div');
-            contentMeasureEl.style.width = 'calc(90mm - 6mm)';
-            measuringDiv.appendChild(contentMeasureEl);
             
             let finalHTML = '';
             const binsArray = Array.from(AppState.bins.values());
             const totalBins = binsArray.length;
 
-            const generateTableHTML = (items) => {
-                let tableRows = '';
-                if (items.length > 0) {
-                    items.forEach(item => {
-                        tableRows += `<tr>
-                            <td>${item.code}</td>
-                            <td>${item.name}</td>
-                            <td style="text-align: center;">${item.quantity}</td>
-                        </tr>`;
-                    });
-                } else {
-                    tableRows = `<tr><td colspan="3" style="text-align:center;height:100mm;">此箱無商品</td></tr>`;
-                }
-                return `<table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
-                    <thead><tr>
-                        <th style="width: 30%;">商品編號</th>
-                        <th style="width: 55%;">品項名稱</th>
-                        <th style="text-align: center;">數量</th>
-                    </tr></thead>
-                    <tbody>${tableRows}</tbody>
-                </table>`;
-            };
-
-            const generatePageHTML = (items, currentPage, totalPages, binData, binIndex, binTotal) => {
-                const newTitle = `第 ${totalBins}-${binIndex + 1} 箱`;
-                const pageInfo = `(${currentPage}/${totalPages})`;
-                const tableContent = generateTableHTML(items);
-                return `<div class="thermal-label">
-                    <div class="header"><h1>${newTitle} <span style="font-size: 60%;">${pageInfo}</span></h1><p><strong>訂單號碼:</strong> ${orderNumber}</p></div>
-                    <div class="content">${tableContent}</div>
-                    <div class="footer"><p>本箱總計: ${binTotal} 件</p><p class="tracking-number">運單號: ${binData.tracking || '______________________'}</p></div>
-                </div>`;
-            };
-
             binsArray.forEach((binData, binIndex) => {
                 const itemsArray = Array.from(binData.items.values());
                 const binTotal = itemsArray.reduce((s, i) => s + i.quantity, 0);
+                const totalPagesForBin = Math.max(1, Math.ceil(itemsArray.length / chunkSize));
                 
-                if (itemsArray.length === 0) {
-                    finalHTML += generatePageHTML([], 1, 1, binData, binIndex, 0);
-                    return;
-                }
+                for (let i = 0; i < totalPagesForBin; i++) {
+                    const itemChunk = itemsArray.slice(i * chunkSize, (i + 1) * chunkSize);
+                    const newTitle = `共 ${totalBins} 箱-第 ${binIndex + 1} 箱`;
+                    const pageInfo = `(${i + 1}/${totalPagesForBin})`;
 
-                let pages = [];
-                let currentPageItems = [];
-                for (const item of itemsArray) {
-                    currentPageItems.push(item);
-                    contentMeasureEl.innerHTML = generateTableHTML(currentPageItems);
-                    
-                    if (contentMeasureEl.scrollHeight > maxContentHeight) {
-                        const lastItem = currentPageItems.pop();
-                        pages.push(currentPageItems);
-                        currentPageItems = [lastItem];
+                    let tableRows = '';
+                    if (itemChunk.length > 0) {
+                        itemChunk.forEach(item => {
+                            tableRows += `<tr>
+                                <td>${item.code}</td>
+                                <td>${item.name}</td>
+                                <td style="text-align: center;">${item.quantity}</td>
+                            </tr>`;
+                        });
+                    } else {
+                        tableRows = `<tr><td colspan="3" style="text-align:center;height:100mm;">此箱無商品</td></tr>`;
                     }
-                }
-                if (currentPageItems.length > 0) {
-                    pages.push(currentPageItems);
-                }
 
-                pages.forEach((pageItems, pageIndex) => {
-                    finalHTML += generatePageHTML(pageItems, pageIndex + 1, pages.length, binData, binIndex, binTotal);
-                });
+                    const tableHTML = `<table>
+                        <thead><tr>
+                            <th style="width: 30%;">商品編號</th>
+                            <th style="width: 55%;">品項名稱</th>
+                            <th style="text-align: center;">數量</th>
+                        </tr></thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>`;
+                    
+                    const footerHTML = `<div class="footer">
+                        <p>本箱總計: ${binTotal} 件</p>
+                        <p>運單號: ${binData.tracking || '______________________'}</p>
+                    </div>`;
+
+                    finalHTML += `<div class="thermal-label">
+                        <div class="header"><h1>${newTitle} <span style="font-size: 60%;">${pageInfo}</span></h1><p><strong>訂單號碼:</strong> ${orderNumber}</p></div>
+                        <div class="content">${tableHTML}</div>
+                        ${footerHTML}
+                    </div>`;
+                }
             });
-            
-            document.body.removeChild(measuringDiv);
 
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
@@ -871,9 +841,16 @@
             }
             printWindow.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><title>列印熱感應標籤 - ${orderNumber}</title>${printStyles}</head><body>${finalHTML}</body></html>`);
             printWindow.document.close();
-            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
-            btn.disabled = false; btn.textContent = '匯出 熱感紙 (10x15)';
+            setTimeout(() => {
+                printWindow.focus(); 
+                printWindow.print();
+                btn.disabled = false;
+                btn.textContent = '匯出 熱感紙 (10x15)';
+            }, 500);
         }
+        // =====================================================================
+        // ========== 修正後的匯出熱感紙函式 (END) ==========
+        // =====================================================================
 
         exportBtn.addEventListener('click', exportCSV);
         exportA4PdfBtn.addEventListener('click', exportA4PDF);
