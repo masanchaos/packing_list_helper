@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧拖拽分箱工具 (V84 - 穩定分頁最終版)</title>
+    <title>智慧拖拽分箱工具 (V86 - 絕對定位列印修正)</title>
     <style>
         /* --- 全局與佈局 --- */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft JhengHei', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #f4f7f6; }
@@ -327,19 +327,34 @@
 
     function intelligentParse(rawLines) {
         const poolMap = new Map();
-        const isNumeric = (str) => str && !isNaN(str) && !isNaN(parseFloat(str));
-        const headers = new Set(["商品編號", "國際條碼", "品項名稱", "數量", "撿完剩"]);
-        let dataLines = rawLines.map(line => line.trim()).filter(line => line && line !== '圖' && !headers.has(line));
-        let i = 0; 
-        while (i < dataLines.length) {
+        const dataLines = rawLines.map(line => line.trim()).filter(line => line);
+
+        for (const line of dataLines) {
+            const parts = line.split(/\s+/);
             let item = null;
-            if (i + 4 < dataLines.length && !isNumeric(dataLines[i + 2]) && isNumeric(dataLines[i + 3]) && isNumeric(dataLines[i + 4])) {
-                item = { code: dataLines[i], barcode: dataLines[i + 1] || 'NA', name: dataLines[i + 2], quantity: parseInt(dataLines[i + 3]) || 0 };
-                i += 5;
-            } else if (i + 3 < dataLines.length && !isNumeric(dataLines[i + 1]) && isNumeric(dataLines[i + 2]) && isNumeric(dataLines[i + 3])) {
-                item = { code: dataLines[i], barcode: 'NA', name: dataLines[i + 1], quantity: parseInt(dataLines[i + 2]) || 0 };
-                i += 4;
-            } else { i++; }
+
+            if (parts.length >= 4) {
+                const quantity = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(quantity)) {
+                    item = {
+                        code: parts[0],
+                        barcode: parts[1],
+                        name: parts.slice(2, parts.length - 1).join(' '),
+                        quantity: quantity
+                    };
+                }
+            } else if (parts.length === 3) {
+                const quantity = parseInt(parts[2], 10);
+                if (!isNaN(quantity)) {
+                    item = {
+                        code: parts[0],
+                        barcode: 'NA',
+                        name: parts[1],
+                        quantity: quantity
+                    };
+                }
+            }
+
             if (item) {
                 if (poolMap.has(item.code)) {
                     poolMap.get(item.code).quantity += item.quantity;
@@ -517,7 +532,7 @@
 
         const L1 = tokens[tokens.length - 1];
         const L2 = tokens[tokens.length - 2];
-        const L3 = tokens.length >= 3 ? tokens[tokens.length - 3] : null;
+        const L3 = tokens.length >= 4 ? tokens[tokens.length - 3] : null;
 
         if (tokens.length >= 4 && isNumeric(L1) && isNumeric(L2) && isNumeric(L3)) {
             const fromBinNum = L2;
@@ -734,7 +749,7 @@
         }
         
         // =======================================================================
-        // ========== 修正後的匯出熱感紙函式 (START) ==========
+        // ========== 最終佈局修正：改用絕對定位 ==========
         // =======================================================================
         function exportThermalLabelsPDF() {
             if (AppState.bins.size === 0) { showToast("沒有任何已分箱的資料可以匯出！", "error"); return; }
@@ -742,45 +757,73 @@
             btn.disabled = true; btn.textContent = '準備預覽...';
             const orderNumber = orderNumberInput.value.trim() || 'N/A';
 
-            // 增加每頁的品項數，因為我們縮小了字體
-            const chunkSize = 11; 
+            const chunkSize = 12;
 
             const printStyles = `<style>
-                @page { size: 100mm 150mm; margin: 5mm; }
+                @page { size: 100mm 150mm; margin: 0; } /* 移除頁邊距，由內部控制 */
                 @media print { body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; } }
                 * { box-sizing: border-box; }
                 body { font-family: 'Helvetica', 'Arial', 'Microsoft JhengHei', sans-serif; }
-                .thermal-label { width: 90mm; height: 140mm; padding: 3mm; display: flex; flex-direction: column; page-break-after: always; border: 1px dashed #ccc; margin: 5mm auto; }
+                
+                /* --- 核心佈局修正：改用絕對定位 --- */
+                .thermal-label {
+                    width: 100mm;
+                    height: 150mm;
+                    padding: 5mm;
+                    position: relative; /* 建立定位基準 */
+                    page-break-after: always;
+                    border-right: 1px dashed #ccc; /* 視覺輔助線 */
+                }
                 .thermal-label:last-child { page-break-after: auto; }
-                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; flex-shrink: 0; }
-                .header h1 { margin: 0 0 5px 0; font-size: 24pt; }
-                .header p { margin: 0; font-size: 12pt; }
-                .content { flex-grow: 1; margin-top: 5px; }
-                .content table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-                /* --- 修正開始：減小表格字型與間距 --- */
+
+                .header {
+                    position: absolute;
+                    top: 5mm;
+                    left: 5mm;
+                    right: 5mm;
+                    height: 20mm; /* 給定一個固定高度 */
+                    text-align: center;
+                    border-bottom: 1px solid #000;
+                }
+                .header h1 { margin: 0; padding-top: 2mm; font-size: 20pt; }
+                .header p { margin: 0; font-size: 10pt; }
+
+                .content {
+                    position: absolute;
+                    top: 25mm; /* header 高度 20mm + 間距 5mm */
+                    bottom: 20mm; /* footer 高度 15mm + 間距 5mm */
+                    left: 5mm;
+                    right: 5mm;
+                    overflow-y: hidden; /* 內容超出時隱藏 */
+                }
+                
+                .footer {
+                    position: absolute;
+                    bottom: 5mm;
+                    left: 5mm;
+                    right: 5mm;
+                    height: 15mm; /* 給定一個固定高度 */
+                    border-top: 1px solid #000;
+                    text-align: center;
+                }
+                /* --- 定位結束 --- */
+
+                .content table { width: 100%; border-collapse: collapse; }
                 .content th, .content td {
                     border: 1px solid #999;
-                    padding: 2px 3px; /* 減少內邊距 */
+                    padding: 1px 3px;
                     text-align: left;
-                    font-size: 9pt;   /* 減小字體 */
-                    line-height: 1.2; /* 調整行高 */
+                    font-size: 9pt;
+                    line-height: 1.2;
                     vertical-align: top;
                     word-break: break-all;
                 }
-                /* --- 修正結束 --- */
                 .content th { background-color: #f2f2f2; font-weight: bold; }
-                .footer {
-                    border-top: 2px solid #000;
-                    padding-top: 3px;
-                    text-align: center;
-                    page-break-inside: avoid;
-                    flex-shrink: 0;
-                }
                 .footer p {
                     font-size: 11pt;
                     margin: 2px 0;
+                    padding-top: 1mm;
                     font-weight: bold;
-                    line-height: 1.2;
                 }
             </style>`;
             
@@ -848,9 +891,6 @@
                 btn.textContent = '匯出 熱感紙 (10x15)';
             }, 500);
         }
-        // =====================================================================
-        // ========== 修正後的匯出熱感紙函式 (END) ==========
-        // =====================================================================
 
         exportBtn.addEventListener('click', exportCSV);
         exportA4PdfBtn.addEventListener('click', exportA4PDF);
