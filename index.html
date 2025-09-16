@@ -330,32 +330,33 @@
         const dataLines = rawLines.map(line => line.trim()).filter(line => line);
 
         for (const line of dataLines) {
-            const parts = line.split(/\s+/);
+            const columns = line.split('\t');
             let item = null;
-
-            if (parts.length >= 4) {
-                const quantity = parseInt(parts[parts.length - 1], 10);
+            
+            // Format: Product Code, Barcode, Product Name, Quantity
+            if (columns.length === 4) {
+                const quantity = parseInt(columns[3], 10);
                 if (!isNaN(quantity)) {
                     item = {
-                        code: parts[0],
-                        barcode: parts[1],
-                        name: parts.slice(2, parts.length - 1).join(' '),
+                        code: columns[0].trim(),
+                        barcode: columns[1].trim() || 'NA', // Handle empty barcode string
+                        name: columns[2].trim(),
                         quantity: quantity
                     };
                 }
-            } else if (parts.length === 3) {
-                const quantity = parseInt(parts[2], 10);
+            } else if (columns.length === 3) { // Fallback for format without barcode
+                const quantity = parseInt(columns[2], 10);
                 if (!isNaN(quantity)) {
                     item = {
-                        code: parts[0],
+                        code: columns[0].trim(),
                         barcode: 'NA',
-                        name: parts[1],
+                        name: columns[1].trim(),
                         quantity: quantity
                     };
                 }
             }
 
-            if (item) {
+            if (item && item.code && item.name) {
                 if (poolMap.has(item.code)) {
                     poolMap.get(item.code).quantity += item.quantity;
                 } else {
